@@ -233,7 +233,8 @@
         <div id="turn-banner-sub">Pick target</div>
     </div>
 
-    <div id="tap-overlay" onclick="onScreenTap()"></div>
+    <!-- TOUCH DELAY FIX: Added ontouchstart -->
+    <div id="tap-overlay" onclick="onScreenTap()" ontouchstart="event.preventDefault(); onScreenTap()"></div>
 
     <div id="accuracy-container">
         <div id="accuracy-cursor"></div>
@@ -323,12 +324,13 @@
             <div class="goal-frame-right"></div>
         </div>
 
+        <!-- TOUCH DELAY FIX: Added ontouchstart -->
         <div id="goal-targets" class="hidden">
-            <div class="g-target tl" onclick="onTargetClick(-1, 1)">↖</div>
-            <div class="g-target tr" onclick="onTargetClick(1, 1)">↗</div>
-            <div class="g-target bl" onclick="onTargetClick(-1, 0)">↙</div>
-            <div class="g-target bc" onclick="onTargetClick(0, 0)">⏺</div>
-            <div class="g-target br" onclick="onTargetClick(1, 0)">↘</div>
+            <div class="g-target tl" onclick="onTargetClick(-1, 1)" ontouchstart="event.preventDefault(); onTargetClick(-1, 1)">↖</div>
+            <div class="g-target tr" onclick="onTargetClick(1, 1)" ontouchstart="event.preventDefault(); onTargetClick(1, 1)">↗</div>
+            <div class="g-target bl" onclick="onTargetClick(-1, 0)" ontouchstart="event.preventDefault(); onTargetClick(-1, 0)">↙</div>
+            <div class="g-target bc" onclick="onTargetClick(0, 0)" ontouchstart="event.preventDefault(); onTargetClick(0, 0)">⏺</div>
+            <div class="g-target br" onclick="onTargetClick(1, 0)" ontouchstart="event.preventDefault(); onTargetClick(1, 0)">↘</div>
         </div>
 
         <div id="queue-wrapper">
@@ -446,23 +448,30 @@
         setTimeout(() => synth.speak(u), 0); 
     }
 
-    // --- ACCURACY BAR LOGIC ---
+    // --- SPEED FIX: Time-based accuracy bar ---
     function startBar() {
         document.getElementById('accuracy-container').style.display = 'block';
         document.getElementById('tap-overlay').style.display = 'block';
         isWaitingForTap = true;
         
         barX = Math.random() * 100; isBarMoving = true;
+        let lastTime = performance.now();
         
-        function animate() {
+        function animate(time) {
             if(!isBarMoving) return;
-            barX += barDir * 1.5; 
+            let dt = time - lastTime;
+            lastTime = time;
+            
+            let speedMultiplier = dt / 16.66; 
+            if (speedMultiplier > 3) speedMultiplier = 3; 
+            
+            barX += barDir * 1.5 * speedMultiplier; 
             if(barX >= 100) { barX = 100; barDir = -1; }
             if(barX <= 0) { barX = 0; barDir = 1; }
             document.getElementById('accuracy-cursor').style.left = barX + '%';
             barAnimId = requestAnimationFrame(animate);
         }
-        animate();
+        barAnimId = requestAnimationFrame(animate);
     }
     
     function onScreenTap() {
@@ -542,80 +551,87 @@
         mm.classList.remove('hidden');
         txt.innerText = "SEARCHING OPPONENT...";
 
-        const roomsRef = window.dbRef(window.db, 'rooms');
-        const snapshot = await window.dbGet(roomsRef);
-        let joined = false;
+        try {
+            const roomsRef = window.dbRef(window.db, 'rooms');
+            const snapshot = await window.dbGet(roomsRef);
+            let joined = false;
 
-        if (snapshot.exists()) {
-            const rooms = snapshot.val();
-            for (const rId in rooms) {
-                if (rooms[rId].state === 'waiting') {
-                    currentRoomId = rId;
-                    myRole = 'p2'; 
-                    p2Team = p1Team; 
-                    p1Team = rooms[rId].p1.team; 
-                    
-                    await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/p2`), { team: p2Team });
-                    await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/state`), 'playing');
-                    
-                    joined = true;
-                    break;
+            if (snapshot.exists()) {
+                const rooms = snapshot.val();
+                for (const rId in rooms) {
+                    if (rooms[rId].state === 'waiting') {
+                        currentRoomId = rId;
+                        myRole = 'p2'; 
+                        p2Team = p1Team; 
+                        p1Team = rooms[rId].p1.team; 
+                        
+                        await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/p2`), { team: p2Team });
+                        await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/state`), 'playing');
+                        
+                        joined = true;
+                        break;
+                    }
                 }
             }
-        }
 
-        if (!joined) {
-            currentRoomId = "room_" + Date.now() + "_" + Math.floor(Math.random()*1000);
-            myRole = 'p1'; 
-            
-            let roomRef = window.dbRef(window.db, `rooms/${currentRoomId}`);
-            await window.dbSet(roomRef, {
-                state: 'waiting',
-                p1: { team: p1Team }
-            });
-
-            window.dbOnDisconnect(roomRef).remove();
-
-            txt.innerText = "WAITING FOR OPPONENT TO JOIN...";
-            
-            await new Promise(resolve => {
-                const stateRef = window.dbRef(window.db, `rooms/${currentRoomId}/state`);
-                const unsub = window.dbOnValue(stateRef, async (snap) => {
-                    if (snap.val() === 'playing') {
-                        unsub();
-                        const p2Snap = await window.dbGet(window.dbRef(window.db, `rooms/${currentRoomId}/p2/team`));
-                        p2Team = p2Snap.val();
-                        resolve();
-                    }
+            if (!joined) {
+                currentRoomId = "room_" + Date.now() + "_" + Math.floor(Math.random()*1000);
+                myRole = 'p1'; 
+                
+                let roomRef = window.dbRef(window.db, `rooms/${currentRoomId}`);
+                await window.dbSet(roomRef, {
+                    state: 'waiting',
+                    p1: { team: p1Team }
                 });
-            });
-        }
 
-        txt.innerText = "OPPONENT FOUND!";
-        sfx.whistle();
-        await delay(1500);
-        mm.classList.add('hidden');
-        startMatch();
+                window.dbOnDisconnect(roomRef).remove();
+
+                txt.innerText = "WAITING FOR OPPONENT TO JOIN...";
+                
+                await new Promise(resolve => {
+                    const stateRef = window.dbRef(window.db, `rooms/${currentRoomId}/state`);
+                    const unsub = window.dbOnValue(stateRef, async (snap) => {
+                        if (snap.val() === 'playing') {
+                            unsub();
+                            const p2Snap = await window.dbGet(window.dbRef(window.db, `rooms/${currentRoomId}/p2/team`));
+                            p2Team = p2Snap.val();
+                            resolve();
+                        }
+                    });
+                });
+            }
+
+            txt.innerText = "OPPONENT FOUND!";
+            sfx.whistle();
+            await delay(1500);
+            mm.classList.add('hidden');
+            startMatch();
+        } catch (e) {
+            txt.innerText = "CONNECTION FAILED! PLAYING LOCAL.";
+            await delay(2000);
+            mm.classList.add('hidden');
+            selectMode('LOCAL');
+        }
     }
 
 
-    // --- MISSING FUNCTION ADDED HERE ---
+    // --- SUDDEN DEATH BUG FIX: checkWinCondition ---
     function checkWinCondition() {
-        // Calculate remaining kicks for the standard 5-kick phase
         let kicksLeftA = Math.max(0, 5 - match.kicksA);
         let kicksLeftB = Math.max(0, 5 - match.kicksB);
 
-        // Check if one team has an insurmountable lead
-        if (match.scoreA > match.scoreB + kicksLeftB) return match.teamA;
-        if (match.scoreB > match.scoreA + kicksLeftA) return match.teamB;
-
-        // Check sudden death rule (must have taken equal number of kicks)
-        if (match.isSuddenDeath && match.kicksA === match.kicksB) {
+        // १. ५ सट भित्रको चेक: यदि एउटा टिमले जितिसक्यो र अर्कोले भेट्टाउन असम्भव छ भने
+        if (match.kicksA <= 5 && match.kicksB <= 5) {
+            if (match.scoreA > match.scoreB + kicksLeftB) return match.teamA;
+            if (match.scoreB > match.scoreA + kicksLeftA) return match.teamB;
+        } 
+        // २. सडन डेथ चेक (Sudden Death): सट ५ भन्दा धेरै भयो र दुवैको सट संख्या बराबर छ भने मात्र कसले जित्यो हेर्ने
+        else if (match.kicksA === match.kicksB) {
             if (match.scoreA > match.scoreB) return match.teamA;
             if (match.scoreB > match.scoreA) return match.teamB;
         }
 
-        return null; // No winner yet, continue game
+        return null; // कसैले जितेको छैन, खेल अघि बढ्छ
     }
 
 
@@ -681,7 +697,6 @@
             await delay(2000); 
             s.style.opacity = '0'; await delay(1000);
 
-            // This line was failing because the function was missing!
             let winner = checkWinCondition(); if (winner) break;
             
             if (match.turn === 'A') { match.turn = 'B'; } else { 
@@ -803,6 +818,48 @@
         });
     }
 
+    // --- REALTIME SYNC LOGIC ---
+    async function submitOnlineMove(moveData) {
+        document.getElementById('turn-banner-sub').innerText = "WAITING FOR OPPONENT...";
+        document.getElementById('turn-banner').classList.add('show');
+        
+        let currentTurnIndex = match.kicksA + match.kicksB;
+        
+        try {
+            let moveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${myRole}`);
+            await window.dbSet(moveRef, moveData);
+
+            let opponentRole = (myRole === 'p1') ? 'p2' : 'p1';
+            let opponentMoveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${opponentRole}`);
+            
+            let opponentMove = await new Promise(resolve => {
+                const unsub = window.dbOnValue(opponentMoveRef, (snap) => {
+                    if (snap.exists()) {
+                        unsub();
+                        resolve(snap.val());
+                    }
+                });
+            });
+
+            document.getElementById('turn-banner').classList.remove('show');
+
+            let isP1Shooter = (match.turn === 'A');
+            let shooterMove = isP1Shooter ? (myRole === 'p1' ? moveData : opponentMove) : (myRole === 'p2' ? moveData : opponentMove);
+            let keeperMove = isP1Shooter ? (myRole === 'p2' ? moveData : opponentMove) : (myRole === 'p1' ? moveData : opponentMove);
+
+            let finalData = calculateResult(shooterMove, keeperMove);
+
+            if(turnResolve) {
+                let res = turnResolve;
+                turnResolve = null;
+                res(finalData); 
+            }
+        } catch (e) {
+            console.error(e);
+            showAlert("SYNC ERROR", "#ff0000");
+        }
+    }
+
     // --- LOGIC FIX: Keeper gusses correctly = ALWAYS SAVE ---
     function calculateResult(shooterMove, keeperMove) {
         let isSave = (shooterMove.target.x === keeperMove.target.x && shooterMove.target.y === keeperMove.target.y);
@@ -845,7 +902,6 @@
         });
     }
 
-    // --- ANIMATION FIX: Post ra Miss ko coordinates perfect thau ma pathaune ---
     async function executeKickAnimation(data) {
         let b = document.getElementById('ball'); let bInner = document.getElementById('ball-inner'); let g = document.getElementById('goalkeeper'); let s = document.getElementById('shooter');
         let sModel = s.querySelector('.player-model'); let gModel = g.querySelector('.player-model');
@@ -862,29 +918,25 @@
 
         let targetLeft, targetTop; let finalScale = 0.6;
         
-        // GOAL or SAVE (Net ko vitra ya keeper ko hat ma)
         if (data.result === 'goal' || data.result === 'save') { 
             targetLeft = 50 + (data.shot.x * 19.5); 
             targetTop = data.shot.y === 1 ? 8 : 16; 
         } 
-        // POST (Thyakai Khamba ma thokkine)
         else if (data.result === 'post') { 
-            if (data.shot.x === -1) targetLeft = 25.5; // Left Post
-            else if (data.shot.x === 1) targetLeft = 74.5; // Right Post
-            else targetLeft = 50; // Center Crossbar
+            if (data.shot.x === -1) targetLeft = 25.5; 
+            else if (data.shot.x === 1) targetLeft = 74.5; 
+            else targetLeft = 50; 
 
-            if (data.shot.y === 1 || data.shot.x === 0) targetTop = 1.5; // Top Bar
-            else targetTop = 15; // Bottom Post
+            if (data.shot.y === 1 || data.shot.x === 0) targetTop = 1.5; 
+            else targetTop = 15; 
 
-            // Bottom Center aimed but Post = Hit crossbar
             if(data.shot.x === 0 && data.shot.y === 0) { targetLeft = 50; targetTop = 1.5; }
         } 
-        // MISS (Goal vanda baahira jane)
         else if (data.result === 'miss') { 
             finalScale = 0.4; 
-            if (data.shot.x === -1) { targetLeft = 12; targetTop = data.shot.y === 1 ? -5 : 10; } // Wide Left
-            else if (data.shot.x === 1) { targetLeft = 88; targetTop = data.shot.y === 1 ? -5 : 10; } // Wide Right
-            else { targetLeft = 50 + (Math.random() > 0.5 ? 15 : -15); targetTop = -10; } // Over the crossbar
+            if (data.shot.x === -1) { targetLeft = 12; targetTop = data.shot.y === 1 ? -5 : 10; } 
+            else if (data.shot.x === 1) { targetLeft = 88; targetTop = data.shot.y === 1 ? -5 : 10; } 
+            else { targetLeft = 50 + (Math.random() > 0.5 ? 15 : -15); targetTop = -10; } 
         }
 
         let gkLeft = 50 + (data.gk.x * 19); 
