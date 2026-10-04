@@ -739,50 +739,51 @@
     }
 
     function getOnlineInput(isUserShooter, shooter, keeper) {
-        return new Promise(resolve => {
-            let banner = document.getElementById('turn-banner'); let title = document.getElementById('turn-banner-title'); let sub = document.getElementById('turn-banner-sub'); let targetOverlay = document.getElementById('goal-targets'); let timer = document.getElementById('timer-display');
-            
-            banner.classList.add('show'); targetOverlay.classList.remove('hidden'); timer.style.display = 'block';
-            userHasClicked = false;
-            
-            let pColor = isUserShooter ? "var(--p1-color)" : "var(--p2-color)";
-            title.innerHTML = `<span style="color:${pColor}">YOUR TURN (${isUserShooter ? 'SHOOTER' : 'KEEPER'})</span>`;
-            
-            if (isUserShooter) {
-                inputPhase = 'shot'; sub.innerText = `Pick target before time runs out!`;
-            } else {
-                inputPhase = 'dive'; sub.innerText = `Pick dive direction before time runs out!`;
-            }
+    return new Promise(resolve => {
+        let banner = document.getElementById('turn-banner'); let title = document.getElementById('turn-banner-title'); let sub = document.getElementById('turn-banner-sub'); let targetOverlay = document.getElementById('goal-targets'); let timer = document.getElementById('timer-display');
+        
+        banner.classList.add('show'); targetOverlay.classList.remove('hidden'); timer.style.display = 'block';
+        userHasClicked = false;
+        
+        let pColor = isUserShooter ? "var(--p1-color)" : "var(--p2-color)";
+        title.innerHTML = `<span style="color:${pColor}">YOUR TURN (${isUserShooter ? 'SHOOTER' : 'KEEPER'})</span>`;
+        
+        if (isUserShooter) {
+            inputPhase = 'shot'; sub.innerText = `Pick target before time runs out!`;
+        } else {
+            inputPhase = 'dive'; sub.innerText = `Pick dive direction before time runs out!`;
+        }
 
-            let timeLeft = 5; timer.innerText = timeLeft;
-            
-            turnResolve = resolve; 
-            
-            currentTimer = setInterval(() => {
-                timeLeft--;
-                if(timeLeft > 0) { 
-                    timer.innerText = timeLeft; sfx.pop(); 
-                } else {
-                    clearInterval(currentTimer);
-                    timer.style.display = 'none';
-                    targetOverlay.classList.add('hidden');
+        let timeLeft = 5; timer.innerText = timeLeft;
+        
+        turnResolve = resolve; 
+        
+        currentTimer = setInterval(() => {
+            timeLeft--;
+            if(timeLeft > 0) { 
+                timer.innerText = timeLeft; sfx.pop(); 
+            } else {
+                clearInterval(currentTimer);
+                timer.style.display = 'none';
+                targetOverlay.classList.add('hidden');
+                
+                if(!userHasClicked) {
+                    userHasClicked = true;
+                    hideBar();
                     
-                    if(!userHasClicked) {
-                        userHasClicked = true;
-                        hideBar();
-                        
-                        let randomTarget = {x: [-1, 0, 1][Math.floor(Math.random()*3)], y: [0, 1][Math.floor(Math.random()*2)]};
-                        
-                        if(isUserShooter) {
-                            submitOnlineMove({ type: 'shot', target: randomTarget, isGreen: false }); 
-                        } else {
-                            submitOnlineMove({ type: 'dive', target: randomTarget });
-                        }
+                    // NAYA CHANGE: Random ko satta Center (0, 0) target garne
+                    let centerTarget = {x: 0, y: 0};
+                    
+                    if(isUserShooter) {
+                        submitOnlineMove({ type: 'shot', target: centerTarget, isGreen: false }); 
+                    } else {
+                        submitOnlineMove({ type: 'dive', target: centerTarget });
                     }
                 }
-            }, 1000);
-        });
-    }
+            }
+        }, 1000);
+    });
+}
 
     // --- REALTIME SYNC LOGIC ---
     async function submitOnlineMove(moveData) {
