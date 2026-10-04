@@ -242,7 +242,6 @@
     <div id="champion-overlay">
         <div class="champ-title">CHAMPION</div>
         <div class="champ-team" id="champ-team-box"></div>
-        <!-- Play Again Button replaces location.reload -->
         <button class="champ-btn" onclick="playAgain()">🔄 PLAY AGAIN</button>
     </div>
 
@@ -547,7 +546,6 @@
         const snapshot = await window.dbGet(roomsRef);
         let joined = false;
 
-        // Try to find an existing room
         if (snapshot.exists()) {
             const rooms = snapshot.val();
             for (const rId in rooms) {
@@ -566,7 +564,6 @@
             }
         }
 
-        // If no room found, create one
         if (!joined) {
             currentRoomId = "room_" + Date.now() + "_" + Math.floor(Math.random()*1000);
             myRole = 'p1'; 
@@ -577,7 +574,6 @@
                 p1: { team: p1Team }
             });
 
-            // Automatically delete room if host disconnects before game starts
             window.dbOnDisconnect(roomRef).remove();
 
             txt.innerText = "WAITING FOR OPPONENT TO JOIN...";
@@ -610,7 +606,6 @@
     }
 
     async function startMatch() {
-        // Reset match values
         match = { teamA: p1Team, teamB: p2Team, scoreA: 0, scoreB: 0, kicksA: 0, kicksB: 0, turn: 'A', isSuddenDeath: false };
         
         document.getElementById('flagA').innerText = p1Team.flag; document.getElementById('nameA').innerText = p1Team.name;
@@ -701,7 +696,6 @@
                 
                 currentPhaseResolver = (isGreen) => {
                     hideBar();
-                    // DESYNC FIX: Random values haru paila nai banayera Dubai phone lai same pathaune
                     let payload = { type: 'shot', target: chosenTarget, isGreen: isGreen, isPost: Math.random() > 0.5, foot: Math.random() > 0.5 ? 'l' : 'r' };
                     
                     if(gameMode === 'ONLINE') submitOnlineMove(payload);
@@ -775,7 +769,6 @@
                         userHasClicked = true;
                         hideBar();
                         
-                        // TIMEOUT FIX: Time sakida always Center ma shot / dive garne
                         let centerTarget = {x: 0, y: 0};
                         
                         if(isUserShooter) {
@@ -796,11 +789,9 @@
         
         let currentTurnIndex = match.kicksA + match.kicksB;
         
-        // Save move to database
         let moveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${myRole}`);
         await window.dbSet(moveRef, moveData);
 
-        // Wait for opponent's move
         let opponentRole = (myRole === 'p1') ? 'p2' : 'p1';
         let opponentMoveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${opponentRole}`);
         
@@ -815,12 +806,10 @@
 
         document.getElementById('turn-banner').classList.remove('show');
 
-        // P1 Shoots on match.turn === 'A'
         let isP1Shooter = (match.turn === 'A');
         let shooterMove = isP1Shooter ? (myRole === 'p1' ? moveData : opponentMove) : (myRole === 'p2' ? moveData : opponentMove);
         let keeperMove = isP1Shooter ? (myRole === 'p2' ? moveData : opponentMove) : (myRole === 'p1' ? moveData : opponentMove);
 
-        // NAYA DESYNC FIX: Exact same result niklinchha aba dubai phone ma
         let finalData = calculateResult(shooterMove, keeperMove);
 
         if(turnResolve) {
@@ -830,14 +819,17 @@
         }
     }
 
+    // --- LOGIC FIX: Keeper gusses correctly = ALWAYS SAVE ---
     function calculateResult(shooterMove, keeperMove) {
         let isSave = (shooterMove.target.x === keeperMove.target.x && shooterMove.target.y === keeperMove.target.y);
         let finalResult = 'goal';
         
-        if (shooterMove.isGreen) {
-            if (isSave) finalResult = 'save';
-        } else {
-            // NAYA DESYNC FIX: Math.random() yaha narakhi Firebase bata aayeko data use garne
+        // 1. Agar Keeper le sahi side dive garyo vane jasto shot vaye pani Save hunchha!
+        if (isSave) {
+            finalResult = 'save';
+        } 
+        // 2. Keeper le wrong dive garyo, tara shot Red zone ma thiyo vane Miss ya Post hunchha
+        else if (!shooterMove.isGreen) {
             finalResult = shooterMove.isPost ? 'post' : 'miss';
         }
 
@@ -849,19 +841,6 @@
             style: 4
         };
     }
-
-    function checkWinCondition() {
-        if (!match.isSuddenDeath) { 
-            let remainA = 5 - match.kicksA; let remainB = 5 - match.kicksB; 
-            if (match.scoreA > match.scoreB + remainB) return match.teamA; 
-            if (match.scoreB > match.scoreA + remainA) return match.teamB; 
-            if (match.kicksA === 5 && match.kicksB === 5 && match.scoreA !== match.scoreB) return match.scoreA > match.scoreB ? match.teamA : match.teamB; 
-        } else { 
-            if (match.kicksA === match.kicksB && match.scoreA !== match.scoreB) return match.scoreA > match.scoreB ? match.teamA : match.teamB; 
-        } 
-        return null;
-    }
-
 
     /*===================================================================
       ANIMATIONS & VISUALS
@@ -882,6 +861,7 @@
         });
     }
 
+    // --- ANIMATION FIX: Post ra Miss ko coordinates perfect thau ma pathaune ---
     async function executeKickAnimation(data) {
         let b = document.getElementById('ball'); let bInner = document.getElementById('ball-inner'); let g = document.getElementById('goalkeeper'); let s = document.getElementById('shooter');
         let sModel = s.querySelector('.player-model'); let gModel = g.querySelector('.player-model');
@@ -898,19 +878,29 @@
 
         let targetLeft, targetTop; let finalScale = 0.6;
         
+        // GOAL or SAVE (Net ko vitra ya keeper ko hat ma)
         if (data.result === 'goal' || data.result === 'save') { 
-            targetLeft = 50 + (data.shot.x * 19.5); targetTop = data.shot.y === 1 ? 8 : 16; 
+            targetLeft = 50 + (data.shot.x * 19.5); 
+            targetTop = data.shot.y === 1 ? 8 : 16; 
         } 
+        // POST (Thyakai Khamba ma thokkine)
         else if (data.result === 'post') { 
-            targetLeft = data.shot.x === -1 ? 26 : (data.shot.x === 1 ? 74 : 50); 
-            targetTop = data.shot.y === 1 ? 2 : 15; 
-            if(data.shot.x === 0 && data.shot.y === 1) targetTop = 2; 
+            if (data.shot.x === -1) targetLeft = 25.5; // Left Post
+            else if (data.shot.x === 1) targetLeft = 74.5; // Right Post
+            else targetLeft = 50; // Center Crossbar
+
+            if (data.shot.y === 1 || data.shot.x === 0) targetTop = 1.5; // Top Bar
+            else targetTop = 15; // Bottom Post
+
+            // Bottom Center aimed but Post = Hit crossbar
+            if(data.shot.x === 0 && data.shot.y === 0) { targetLeft = 50; targetTop = 1.5; }
         } 
+        // MISS (Goal vanda baahira jane)
         else if (data.result === 'miss') { 
-            finalScale = 0.35; 
-            if (data.shot.y === 1) { targetTop = -2; targetLeft = 50 + (Math.random() * 30 - 15); } 
-            else if (data.shot.x === -1) { targetTop = 10; targetLeft = 10; } 
-            else { targetTop = 10; targetLeft = 90; } 
+            finalScale = 0.4; 
+            if (data.shot.x === -1) { targetLeft = 12; targetTop = data.shot.y === 1 ? -5 : 10; } // Wide Left
+            else if (data.shot.x === 1) { targetLeft = 88; targetTop = data.shot.y === 1 ? -5 : 10; } // Wide Right
+            else { targetLeft = 50 + (Math.random() > 0.5 ? 15 : -15); targetTop = -10; } // Over the crossbar
         }
 
         let gkLeft = 50 + (data.gk.x * 19); 
@@ -965,7 +955,6 @@
     function showAlert(text, color) { let box = document.getElementById('alert-box'); let textEl = document.getElementById('alert-text'); textEl.innerText = text; textEl.style.color = color; box.classList.add('alert-show'); }
     
     async function showChampion(team) { 
-        // Update Series Score
         if (team.name === match.teamA.name) seriesWinsA++;
         else seriesWinsB++;
 
@@ -980,32 +969,25 @@
         }
     }
 
-    // --- PLAY AGAIN SYSTEM ---
     async function playAgain() {
         sfx.pop();
         
-        // Hide Champion Overlay & clear old falling emojis
         document.getElementById('champion-overlay').classList.remove('show');
         document.querySelectorAll('.falling-item').forEach(e => e.remove());
         
-        // Show Series Record panel
         document.getElementById('ss-p1-text').innerText = `${p1Team.name}: ${seriesWinsA} WINS`;
         document.getElementById('ss-p2-text').innerText = `${p2Team.name}: ${seriesWinsB} WINS`;
         let ssPanel = document.getElementById('series-score');
         ssPanel.classList.add('show');
         
-        // Hide after 4 seconds
         setTimeout(() => { ssPanel.classList.remove('show'); }, 4000);
 
-        // NAYA: Host le matra database bata purano moves clear garchha taaki conflict nahos
         if(gameMode === 'ONLINE' && myRole === 'p1') {
             await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/moves`), null);
         }
         
-        // Sanu delay dine jisse P2 le P1 ko clear huna time paos
         await delay(500);
         
-        // Fheri naya match suru
         startMatch();
     }
 </script>
