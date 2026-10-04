@@ -599,6 +599,26 @@
     }
 
 
+    // --- MISSING FUNCTION ADDED HERE ---
+    function checkWinCondition() {
+        // Calculate remaining kicks for the standard 5-kick phase
+        let kicksLeftA = Math.max(0, 5 - match.kicksA);
+        let kicksLeftB = Math.max(0, 5 - match.kicksB);
+
+        // Check if one team has an insurmountable lead
+        if (match.scoreA > match.scoreB + kicksLeftB) return match.teamA;
+        if (match.scoreB > match.scoreA + kicksLeftA) return match.teamB;
+
+        // Check sudden death rule (must have taken equal number of kicks)
+        if (match.isSuddenDeath && match.kicksA === match.kicksB) {
+            if (match.scoreA > match.scoreB) return match.teamA;
+            if (match.scoreB > match.scoreA) return match.teamB;
+        }
+
+        return null; // No winner yet, continue game
+    }
+
+
     // --- MATCH LOGIC ---
     function populateQueues(teamA, teamB) {
         let qa = document.getElementById('teamA-queue'); let qb = document.getElementById('teamB-queue'); qa.innerHTML = ''; qb.innerHTML = '';
@@ -661,6 +681,7 @@
             await delay(2000); 
             s.style.opacity = '0'; await delay(1000);
 
+            // This line was failing because the function was missing!
             let winner = checkWinCondition(); if (winner) break;
             
             if (match.turn === 'A') { match.turn = 'B'; } else { 
@@ -780,43 +801,6 @@
                 }
             }, 1000);
         });
-    }
-
-    // --- REALTIME SYNC LOGIC ---
-    async function submitOnlineMove(moveData) {
-        document.getElementById('turn-banner-sub').innerText = "WAITING FOR OPPONENT...";
-        document.getElementById('turn-banner').classList.add('show');
-        
-        let currentTurnIndex = match.kicksA + match.kicksB;
-        
-        let moveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${myRole}`);
-        await window.dbSet(moveRef, moveData);
-
-        let opponentRole = (myRole === 'p1') ? 'p2' : 'p1';
-        let opponentMoveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${opponentRole}`);
-        
-        let opponentMove = await new Promise(resolve => {
-            const unsub = window.dbOnValue(opponentMoveRef, (snap) => {
-                if (snap.exists()) {
-                    unsub();
-                    resolve(snap.val());
-                }
-            });
-        });
-
-        document.getElementById('turn-banner').classList.remove('show');
-
-        let isP1Shooter = (match.turn === 'A');
-        let shooterMove = isP1Shooter ? (myRole === 'p1' ? moveData : opponentMove) : (myRole === 'p2' ? moveData : opponentMove);
-        let keeperMove = isP1Shooter ? (myRole === 'p2' ? moveData : opponentMove) : (myRole === 'p1' ? moveData : opponentMove);
-
-        let finalData = calculateResult(shooterMove, keeperMove);
-
-        if(turnResolve) {
-            let res = turnResolve;
-            turnResolve = null;
-            res(finalData); 
-        }
     }
 
     // --- LOGIC FIX: Keeper gusses correctly = ALWAYS SAVE ---
