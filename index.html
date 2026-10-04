@@ -107,19 +107,19 @@
     .team-btn .t-flag { font-size: 1.8rem; line-height: 1; margin-bottom: 5px; }
     .team-btn .t-name { font-size: 0.65rem; color: #fff; font-weight: bold; text-align: center; text-transform: uppercase; }
 
-    /* UI FIX: BANNER MOVED DOWN (was 30%, now 40%) */
-    #turn-banner { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); z-index: 150; text-align: center; display: none; width: 100%; pointer-events: none; }
+    /* UI FIX: BANNER MOVED MORE DOWN TO 50% */
+    #turn-banner { position: absolute; top: 50%; left: 50%; transform: translateX(-50%); z-index: 150; text-align: center; display: none; width: 100%; pointer-events: none; }
     #turn-banner.show { display: block; animation: popBanner 0.3s ease-out; }
     @keyframes popBanner { 0% { transform: translate(-50%, -10px) scale(0.9); opacity: 0; } 100% { transform: translate(-50%, 0) scale(1); opacity: 1; } }
     #turn-banner-title { font-family: 'Oswald', sans-serif; font-size: 1.8rem; color: #fff; line-height: 1.1; margin-bottom: 5px; text-shadow: 2px 2px 6px rgba(0,0,0,1), -1px -1px 3px rgba(0,0,0,0.8); }
     #turn-banner-sub { font-size: 0.95rem; color: #fff; text-transform: uppercase; font-weight: bold; text-shadow: 1px 1px 4px rgba(0,0,0,1); }
     
-    /* UI FIX: TIMER MOVED DOWN slightly to avoid goal (was 22%, now 26%) */
-    #timer-display { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); font-family: 'Oswald', sans-serif; font-size: 4rem; color: #fff; text-shadow: 0 0 15px var(--red), 0 0 5px var(--red); z-index: 155; display: none; line-height: 1;}
+    /* UI FIX: TIMER MOVED DOWN TO 38% */
+    #timer-display { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); font-family: 'Oswald', sans-serif; font-size: 4rem; color: #fff; text-shadow: 0 0 15px var(--red), 0 0 5px var(--red); z-index: 155; display: none; line-height: 1;}
 
-    /* ACCURACY BAR (TALA SAREKO & SCREEN TAP OVERLAY) */
+    /* ACCURACY BAR */
     #accuracy-container {
-        position: absolute; top: 72%; left: 50%; transform: translateX(-50%); 
+        position: absolute; top: 78%; left: 50%; transform: translateX(-50%); 
         width: 65%; height: 22px; border: 2px solid #fff; border-radius: 12px;
         background: linear-gradient(to right, var(--red) 0%, var(--red) 35%, var(--green) 35%, var(--green) 65%, var(--red) 65%, var(--red) 100%);
         z-index: 160; box-shadow: 0 5px 15px rgba(0,0,0,0.8); display: none; overflow: hidden;
@@ -342,10 +342,10 @@
     </div>
 </div>
 
-<!-- FIREBASE SDK SETUP -->
+<!-- FIREBASE SDK & INIT -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, set, onValue, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, set, onValue, get, child, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBtCvg3GujBPoSFVoRpnh6gny9qfM1FK0g",
@@ -359,13 +359,14 @@
     const app = initializeApp(firebaseConfig);
     const database = getDatabase(app);
 
-    // Ye functions global banaye hain taaki niche wali script unhe use kar sake
+    // Make Firebase functions available to normal scripts
     window.db = database;
     window.dbRef = ref;
     window.dbSet = set;
     window.dbGet = get;
     window.dbChild = child;
     window.dbOnValue = onValue;
+    window.dbOnDisconnect = onDisconnect;
 </script>
 
 <script>
@@ -396,6 +397,10 @@
     let barAnimId;
     let barX = 0; let barDir = 1; let isBarMoving = false;
     let isWaitingForTap = false;
+
+    // Multiplayer States
+    let myRole = ''; 
+    let currentRoomId = '';
 
     // --- Audio System ---
     function initAudioEngine() {
@@ -524,25 +529,67 @@
         });
     }
 
+    // --- REALTIME MATCHMAKING ---
     async function findOpponent() {
         let mm = document.getElementById('matchmaking-screen');
         let txt = document.getElementById('mm-text');
         mm.classList.remove('hidden');
         txt.innerText = "SEARCHING OPPONENT...";
-        
-        // ---------------------------------------------------------
-        // Yahan par actual Matchmaking Logic aayega future mein:
-        // window.dbGet() use karke DB check karenge ki koi aur wait kar raha hai ya nahi.
-        // ---------------------------------------------------------
-        
-        await delay(2000); // Simulate network
-        
+
+        const roomsRef = window.dbRef(window.db, 'rooms');
+        const snapshot = await window.dbGet(roomsRef);
+        let joined = false;
+
+        // Try to find an existing room
+        if (snapshot.exists()) {
+            const rooms = snapshot.val();
+            for (const rId in rooms) {
+                if (rooms[rId].state === 'waiting') {
+                    currentRoomId = rId;
+                    myRole = 'p2'; // Client is Player 2
+                    p2Team = p1Team; // Keep user's selection as P2 team
+                    p1Team = rooms[rId].p1.team; // Get host's team as P1
+                    
+                    await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/p2`), { team: p2Team });
+                    await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/state`), 'playing');
+                    
+                    joined = true;
+                    break;
+                }
+            }
+        }
+
+        // If no room found, create one
+        if (!joined) {
+            currentRoomId = "room_" + Date.now() + "_" + Math.floor(Math.random()*1000);
+            myRole = 'p1'; // Client is Player 1 (Host)
+            
+            let roomRef = window.dbRef(window.db, `rooms/${currentRoomId}`);
+            await window.dbSet(roomRef, {
+                state: 'waiting',
+                p1: { team: p1Team }
+            });
+
+            // Automatically delete room if host disconnects before game starts
+            window.dbOnDisconnect(roomRef).remove();
+
+            txt.innerText = "WAITING FOR OPPONENT TO JOIN...";
+            
+            await new Promise(resolve => {
+                const stateRef = window.dbRef(window.db, `rooms/${currentRoomId}/state`);
+                const unsub = window.dbOnValue(stateRef, async (snap) => {
+                    if (snap.val() === 'playing') {
+                        unsub();
+                        const p2Snap = await window.dbGet(window.dbRef(window.db, `rooms/${currentRoomId}/p2/team`));
+                        p2Team = p2Snap.val();
+                        resolve();
+                    }
+                });
+            });
+        }
+
         txt.innerText = "OPPONENT FOUND!";
         sfx.whistle();
-        
-        let availableTeams = TEAMS_32.filter(t => t.name !== p1Team.name);
-        p2Team = availableTeams[Math.floor(Math.random() * availableTeams.length)];
-        
         await delay(1500);
         mm.classList.add('hidden');
         startMatch();
@@ -568,6 +615,8 @@
         while (true) {
             let currentTeam = match.turn === 'A' ? match.teamA : match.teamB; 
             let defendingTeam = match.turn === 'A' ? match.teamB : match.teamA;
+            
+            // P1 is always Host (teamA), P2 is always Guest (teamB)
             let playerRole = match.turn === 'A' ? "P1" : "P2";
             let keeperRole = match.turn === 'A' ? "P2" : "P1";
             let pColor = match.turn === 'A' ? "var(--p1-color)" : "var(--p2-color)";
@@ -591,7 +640,9 @@
             if (gameMode === 'LOCAL') {
                 shotData = await getLocalInput(currentTeam, defendingTeam, playerRole, keeperRole, pColor, kColor);
             } else {
-                shotData = await getOnlineInput(match.turn === 'A', currentTeam, defendingTeam);
+                // Determine if local client is the shooter this turn
+                let isUserShooter = (myRole === 'p1' && match.turn === 'A') || (myRole === 'p2' && match.turn === 'B');
+                shotData = await getOnlineInput(isUserShooter, currentTeam, defendingTeam);
             }
             
             speak(`${currentTeam.name} steps up.`, true);
@@ -733,30 +784,38 @@
         });
     }
 
-    // ---------------------------------------------------------
-    // ONLINE MULTIPLAYER SIMULATION / FIREBASE SYNC LOGIC
-    // ---------------------------------------------------------
+    // --- REALTIME SYNC LOGIC ---
     async function submitOnlineMove(moveData) {
         document.getElementById('turn-banner-sub').innerText = "WAITING FOR OPPONENT...";
+        document.getElementById('turn-banner').classList.add('show');
         
-        // ---------------------------------------------------------
-        // Yahan par window.dbSet() use karke moveData database mein bhejna hoga.
-        // Phir window.dbOnValue() se opponent ka data aane ka wait karna hoga.
-        // ---------------------------------------------------------
+        let currentTurnIndex = match.kicksA + match.kicksB;
         
-        await delay(1200); // Simulate network
+        // Save move to database
+        let moveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${myRole}`);
+        await window.dbSet(moveRef, moveData);
 
-        let opponentChoices = {x: [-1, 0, 1][Math.floor(Math.random()*3)], y: [0, 1][Math.floor(Math.random()*2)]};
-        let opponentIsGreen = Math.random() < 0.8; 
+        // Wait for opponent's move
+        let opponentRole = (myRole === 'p1') ? 'p2' : 'p1';
+        let opponentMoveRef = window.dbRef(window.db, `rooms/${currentRoomId}/moves/${currentTurnIndex}/${opponentRole}`);
+        
+        let opponentMove = await new Promise(resolve => {
+            const unsub = window.dbOnValue(opponentMoveRef, (snap) => {
+                if (snap.exists()) {
+                    unsub();
+                    resolve(snap.val());
+                }
+            });
+        });
 
         document.getElementById('turn-banner').classList.remove('show');
 
-        let finalData;
-        if(moveData.type === 'shot') {
-            finalData = calculateResult(moveData.target, opponentChoices, moveData.isGreen);
-        } else {
-            finalData = calculateResult(opponentChoices, moveData.target, opponentIsGreen);
-        }
+        // P1 Shoots on match.turn === 'A'
+        let isP1Shooter = (match.turn === 'A');
+        let shooterMove = isP1Shooter ? (myRole === 'p1' ? moveData : opponentMove) : (myRole === 'p2' ? moveData : opponentMove);
+        let keeperMove = isP1Shooter ? (myRole === 'p2' ? moveData : opponentMove) : (myRole === 'p1' ? moveData : opponentMove);
+
+        let finalData = calculateResult(shooterMove.target, keeperMove.target, shooterMove.isGreen);
 
         if(turnResolve) {
             let res = turnResolve;
