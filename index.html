@@ -107,14 +107,12 @@
     .team-btn .t-flag { font-size: 1.8rem; line-height: 1; margin-bottom: 5px; }
     .team-btn .t-name { font-size: 0.65rem; color: #fff; font-weight: bold; text-align: center; text-transform: uppercase; }
 
-    /* UI FIX: BANNER MOVED MORE DOWN TO 50% */
     #turn-banner { position: absolute; top: 50%; left: 50%; transform: translateX(-50%); z-index: 150; text-align: center; display: none; width: 100%; pointer-events: none; }
     #turn-banner.show { display: block; animation: popBanner 0.3s ease-out; }
     @keyframes popBanner { 0% { transform: translate(-50%, -10px) scale(0.9); opacity: 0; } 100% { transform: translate(-50%, 0) scale(1); opacity: 1; } }
     #turn-banner-title { font-family: 'Oswald', sans-serif; font-size: 1.8rem; color: #fff; line-height: 1.1; margin-bottom: 5px; text-shadow: 2px 2px 6px rgba(0,0,0,1), -1px -1px 3px rgba(0,0,0,0.8); }
     #turn-banner-sub { font-size: 0.95rem; color: #fff; text-transform: uppercase; font-weight: bold; text-shadow: 1px 1px 4px rgba(0,0,0,1); }
     
-    /* UI FIX: TIMER MOVED DOWN TO 38% */
     #timer-display { position: absolute; top: 38%; left: 50%; transform: translateX(-50%); font-family: 'Oswald', sans-serif; font-size: 4rem; color: #fff; text-shadow: 0 0 15px var(--red), 0 0 5px var(--red); z-index: 155; display: none; line-height: 1;}
 
     /* ACCURACY BAR */
@@ -130,11 +128,7 @@
         transform: translateX(-50%);
     }
 
-    /* INVISIBLE OVERLAY TO CAPTURE TAP ANYWHERE */
-    #tap-overlay {
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        z-index: 155; display: none; cursor: pointer;
-    }
+    #tap-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 155; display: none; cursor: pointer; }
 
     /* GOAL TARGETS */
     #goal-targets { position: absolute; top: 2%; left: 26%; width: 48%; height: 18%; z-index: 150; display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 3px; }
@@ -194,37 +188,44 @@
     .falling-item { position: absolute; font-size: 2rem; animation: fall linear infinite; z-index: 501; pointer-events: none; }
     @keyframes pulseGlow { 0% { transform: scale(1); filter: brightness(1); } 100% { transform: scale(1.1); filter: brightness(1.3); text-shadow: 0 0 30px #f8ca25, 0 0 60px #f8ca25, 0 0 90px #fff; } }
     @keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
+
+    /* SERIES RECORD SLIDE PANEL */
+    #series-score {
+        position: absolute; top: 15%; right: -100%;
+        background: rgba(0,0,0,0.85); border: 2px solid var(--gold);
+        padding: 10px 15px; border-radius: 10px 0 0 10px;
+        z-index: 600; transition: right 0.5s ease-out;
+        box-shadow: -5px 5px 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px);
+        text-align: center;
+    }
+    #series-score.show { right: 0; }
+    .ss-title { font-family: 'Oswald', sans-serif; font-size: 1.2rem; color: #fff; margin-bottom: 5px; border-bottom: 1px solid #555; padding-bottom: 3px;}
+    .ss-team { font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; font-weight: bold; }
 </style>
 </head>
 <body>
 
 <div id="game-container">
-    <!-- MAIN MENU -->
     <div id="controls-overlay">
         <h1 class="menu-title">FIFA SHOOTOUT</h1>
-        
         <button class="btn-main btn-online" onclick="selectMode('ONLINE')">🌐 ONLINE MULTIPLAYER</button>
         <button class="btn-main" onclick="selectMode('LOCAL')">🎮 PASS N PLAY (LOCAL)</button>
-        
         <div class="settings-row">
             <button id="btn-sound" class="btn-secondary" onclick="toggleSound()">🔊 Sound: ON</button>
             <button id="btn-tts" class="btn-secondary" onclick="toggleTTS()">🗣️ TTS: ON</button>
         </div>
     </div>
 
-    <!-- MATCHMAKING SCREEN (FOR ONLINE MODE) -->
     <div id="matchmaking-screen" class="hidden">
         <div class="loading-spinner"></div>
         <h2 style="font-family:'Oswald'; color:#fff; letter-spacing:1px;" id="mm-text">SEARCHING OPPONENT...</h2>
     </div>
 
-    <!-- TEAM SELECTION SCREEN -->
     <div id="team-select-screen" class="hidden">
         <h2 id="ts-title">SELECT TEAM</h2>
         <div id="team-grid"></div>
     </div>
 
-    <!-- TIMERS AND BANNERS -->
     <div id="timer-display">5</div>
     
     <div id="turn-banner">
@@ -232,21 +233,26 @@
         <div id="turn-banner-sub">Pick target</div>
     </div>
 
-    <!-- INVISIBLE OVERLAY TO CATCH SCREEN TAPS FOR BAR -->
     <div id="tap-overlay" onclick="onScreenTap()"></div>
 
     <div id="accuracy-container">
         <div id="accuracy-cursor"></div>
     </div>
 
-    <!-- CHAMPION SCREEN -->
     <div id="champion-overlay">
         <div class="champ-title">CHAMPION</div>
         <div class="champ-team" id="champ-team-box"></div>
-        <button class="champ-btn" onclick="location.reload()">🔄 PLAY AGAIN</button>
+        <!-- Play Again Button replaces location.reload -->
+        <button class="champ-btn" onclick="playAgain()">🔄 PLAY AGAIN</button>
     </div>
 
-    <!-- HEADER -->
+    <!-- SERIES SCORE PANEL -->
+    <div id="series-score">
+        <div class="ss-title">SERIES RECORD</div>
+        <div class="ss-team" id="ss-p1-text" style="color:var(--p1-color)">P1: 0</div>
+        <div class="ss-team" id="ss-p2-text" style="color:var(--p2-color)">P2: 0</div>
+    </div>
+
     <div id="header">
         <div class="header-col header-col-left">
             <div class="header-title">MULTIPLAYER</div>
@@ -263,7 +269,6 @@
         </div>
     </div>
 
-    <!-- SCOREBOARD -->
     <div id="scoreboard">
         <div class="score-row">
             <div class="team-info left" id="teamA-info">
@@ -289,7 +294,6 @@
         <div class="next-shooter-text">WAITING TO START...</div>
     </div>
 
-    <!-- PITCH -->
     <div id="pitch">
         <div class="pitch-line goal-line-h"></div>
         <div class="pitch-line penalty-box"></div>
@@ -359,7 +363,6 @@
     const app = initializeApp(firebaseConfig);
     const database = getDatabase(app);
 
-    // Make Firebase functions available to normal scripts
     window.db = database;
     window.dbRef = ref;
     window.dbSet = set;
@@ -388,6 +391,10 @@
     let p1Team = null; let p2Team = null;
     let match = { teamA: null, teamB: null, scoreA: 0, scoreB: 0, kicksA: 0, kicksB: 0, turn: 'A', isSuddenDeath: false };
     
+    // SERIES SCORE TRACKING
+    let seriesWinsA = 0; 
+    let seriesWinsB = 0;
+
     let inputPhase = 'shot'; 
     let userHasClicked = false;
     let turnResolve = null; 
@@ -546,9 +553,9 @@
             for (const rId in rooms) {
                 if (rooms[rId].state === 'waiting') {
                     currentRoomId = rId;
-                    myRole = 'p2'; // Client is Player 2
-                    p2Team = p1Team; // Keep user's selection as P2 team
-                    p1Team = rooms[rId].p1.team; // Get host's team as P1
+                    myRole = 'p2'; 
+                    p2Team = p1Team; 
+                    p1Team = rooms[rId].p1.team; 
                     
                     await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/p2`), { team: p2Team });
                     await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/state`), 'playing');
@@ -562,7 +569,7 @@
         // If no room found, create one
         if (!joined) {
             currentRoomId = "room_" + Date.now() + "_" + Math.floor(Math.random()*1000);
-            myRole = 'p1'; // Client is Player 1 (Host)
+            myRole = 'p1'; 
             
             let roomRef = window.dbRef(window.db, `rooms/${currentRoomId}`);
             await window.dbSet(roomRef, {
@@ -603,7 +610,9 @@
     }
 
     async function startMatch() {
+        // Reset match values
         match = { teamA: p1Team, teamB: p2Team, scoreA: 0, scoreB: 0, kicksA: 0, kicksB: 0, turn: 'A', isSuddenDeath: false };
+        
         document.getElementById('flagA').innerText = p1Team.flag; document.getElementById('nameA').innerText = p1Team.name;
         document.getElementById('flagB').innerText = p2Team.flag; document.getElementById('nameB').innerText = p2Team.name;
         document.getElementById('dotsA').innerHTML = ''; document.getElementById('dotsB').innerHTML = '';
@@ -616,7 +625,6 @@
             let currentTeam = match.turn === 'A' ? match.teamA : match.teamB; 
             let defendingTeam = match.turn === 'A' ? match.teamB : match.teamA;
             
-            // P1 is always Host (teamA), P2 is always Guest (teamB)
             let playerRole = match.turn === 'A' ? "P1" : "P2";
             let keeperRole = match.turn === 'A' ? "P2" : "P1";
             let pColor = match.turn === 'A' ? "var(--p1-color)" : "var(--p2-color)";
@@ -635,12 +643,10 @@
             s.style.transition = 'top 0.8s linear, left 0.8s linear'; s.style.top = '52%'; s.style.left = '50%';
             await delay(800); s.classList.remove('walking'); sModel.classList.add('idle-breathe');
             
-            // --- GET INPUT BASED ON MODE ---
             let shotData;
             if (gameMode === 'LOCAL') {
                 shotData = await getLocalInput(currentTeam, defendingTeam, playerRole, keeperRole, pColor, kColor);
             } else {
-                // Determine if local client is the shooter this turn
                 let isUserShooter = (myRole === 'p1' && match.turn === 'A') || (myRole === 'p2' && match.turn === 'B');
                 shotData = await getOnlineInput(isUserShooter, currentTeam, defendingTeam);
             }
@@ -695,20 +701,18 @@
                 
                 currentPhaseResolver = (isGreen) => {
                     hideBar();
-                    if(gameMode === 'ONLINE') {
-                        submitOnlineMove({ type: 'shot', target: chosenTarget, isGreen: isGreen });
-                    } else {
-                        turnResolve({ target: chosenTarget, isGreen: isGreen });
-                    }
+                    // DESYNC FIX: Random values haru paila nai banayera Dubai phone lai same pathaune
+                    let payload = { type: 'shot', target: chosenTarget, isGreen: isGreen, isPost: Math.random() > 0.5, foot: Math.random() > 0.5 ? 'l' : 'r' };
+                    
+                    if(gameMode === 'ONLINE') submitOnlineMove(payload);
+                    else turnResolve(payload);
                 };
                 startBar(); 
                 
             } else {
-                if(gameMode === 'ONLINE') {
-                    submitOnlineMove({ type: 'dive', target: chosenTarget });
-                } else {
-                    turnResolve({ target: chosenTarget });
-                }
+                let payload = { type: 'dive', target: chosenTarget };
+                if(gameMode === 'ONLINE') submitOnlineMove(payload);
+                else turnResolve(payload);
             }
         }
     }
@@ -734,56 +738,56 @@
             let diveResult = await new Promise(res => { turnResolve = res; });
             banner.classList.remove('show'); turnResolve = null;
 
-            resolve(calculateResult(shotResult.target, diveResult.target, shotResult.isGreen));
+            resolve(calculateResult(shotResult, diveResult));
         });
     }
 
     function getOnlineInput(isUserShooter, shooter, keeper) {
-    return new Promise(resolve => {
-        let banner = document.getElementById('turn-banner'); let title = document.getElementById('turn-banner-title'); let sub = document.getElementById('turn-banner-sub'); let targetOverlay = document.getElementById('goal-targets'); let timer = document.getElementById('timer-display');
-        
-        banner.classList.add('show'); targetOverlay.classList.remove('hidden'); timer.style.display = 'block';
-        userHasClicked = false;
-        
-        let pColor = isUserShooter ? "var(--p1-color)" : "var(--p2-color)";
-        title.innerHTML = `<span style="color:${pColor}">YOUR TURN (${isUserShooter ? 'SHOOTER' : 'KEEPER'})</span>`;
-        
-        if (isUserShooter) {
-            inputPhase = 'shot'; sub.innerText = `Pick target before time runs out!`;
-        } else {
-            inputPhase = 'dive'; sub.innerText = `Pick dive direction before time runs out!`;
-        }
-
-        let timeLeft = 5; timer.innerText = timeLeft;
-        
-        turnResolve = resolve; 
-        
-        currentTimer = setInterval(() => {
-            timeLeft--;
-            if(timeLeft > 0) { 
-                timer.innerText = timeLeft; sfx.pop(); 
+        return new Promise(resolve => {
+            let banner = document.getElementById('turn-banner'); let title = document.getElementById('turn-banner-title'); let sub = document.getElementById('turn-banner-sub'); let targetOverlay = document.getElementById('goal-targets'); let timer = document.getElementById('timer-display');
+            
+            banner.classList.add('show'); targetOverlay.classList.remove('hidden'); timer.style.display = 'block';
+            userHasClicked = false;
+            
+            let pColor = isUserShooter ? "var(--p1-color)" : "var(--p2-color)";
+            title.innerHTML = `<span style="color:${pColor}">YOUR TURN (${isUserShooter ? 'SHOOTER' : 'KEEPER'})</span>`;
+            
+            if (isUserShooter) {
+                inputPhase = 'shot'; sub.innerText = `Pick target before time runs out!`;
             } else {
-                clearInterval(currentTimer);
-                timer.style.display = 'none';
-                targetOverlay.classList.add('hidden');
-                
-                if(!userHasClicked) {
-                    userHasClicked = true;
-                    hideBar();
+                inputPhase = 'dive'; sub.innerText = `Pick dive direction before time runs out!`;
+            }
+
+            let timeLeft = 5; timer.innerText = timeLeft;
+            
+            turnResolve = resolve; 
+            
+            currentTimer = setInterval(() => {
+                timeLeft--;
+                if(timeLeft > 0) { 
+                    timer.innerText = timeLeft; sfx.pop(); 
+                } else {
+                    clearInterval(currentTimer);
+                    timer.style.display = 'none';
+                    targetOverlay.classList.add('hidden');
                     
-                    // NAYA CHANGE: Random ko satta Center (0, 0) target garne
-                    let centerTarget = {x: 0, y: 0};
-                    
-                    if(isUserShooter) {
-                        submitOnlineMove({ type: 'shot', target: centerTarget, isGreen: false }); 
-                    } else {
-                        submitOnlineMove({ type: 'dive', target: centerTarget });
+                    if(!userHasClicked) {
+                        userHasClicked = true;
+                        hideBar();
+                        
+                        // TIMEOUT FIX: Time sakida always Center ma shot / dive garne
+                        let centerTarget = {x: 0, y: 0};
+                        
+                        if(isUserShooter) {
+                            submitOnlineMove({ type: 'shot', target: centerTarget, isGreen: false, isPost: Math.random() > 0.5, foot: Math.random() > 0.5 ? 'l' : 'r' }); 
+                        } else {
+                            submitOnlineMove({ type: 'dive', target: centerTarget });
+                        }
                     }
                 }
-            }
-        }, 1000);
-    });
-}
+            }, 1000);
+        });
+    }
 
     // --- REALTIME SYNC LOGIC ---
     async function submitOnlineMove(moveData) {
@@ -816,7 +820,8 @@
         let shooterMove = isP1Shooter ? (myRole === 'p1' ? moveData : opponentMove) : (myRole === 'p2' ? moveData : opponentMove);
         let keeperMove = isP1Shooter ? (myRole === 'p2' ? moveData : opponentMove) : (myRole === 'p1' ? moveData : opponentMove);
 
-        let finalData = calculateResult(shooterMove.target, keeperMove.target, shooterMove.isGreen);
+        // NAYA DESYNC FIX: Exact same result niklinchha aba dubai phone ma
+        let finalData = calculateResult(shooterMove, keeperMove);
 
         if(turnResolve) {
             let res = turnResolve;
@@ -825,21 +830,22 @@
         }
     }
 
-    function calculateResult(shotTarget, diveTarget, isAccurate) {
-        let isSave = (shotTarget.x === diveTarget.x && shotTarget.y === diveTarget.y);
+    function calculateResult(shooterMove, keeperMove) {
+        let isSave = (shooterMove.target.x === keeperMove.target.x && shooterMove.target.y === keeperMove.target.y);
         let finalResult = 'goal';
         
-        if (isAccurate) {
+        if (shooterMove.isGreen) {
             if (isSave) finalResult = 'save';
         } else {
-            finalResult = (Math.random() > 0.5) ? 'post' : 'miss';
+            // NAYA DESYNC FIX: Math.random() yaha narakhi Firebase bata aayeko data use garne
+            finalResult = shooterMove.isPost ? 'post' : 'miss';
         }
 
         return {
-            shot: shotTarget,
-            gk: diveTarget,
+            shot: shooterMove.target,
+            gk: keeperMove.target,
             result: finalResult,
-            foot: Math.random() > 0.5 ? 'l' : 'r',
+            foot: shooterMove.foot || 'r',
             style: 4
         };
     }
@@ -959,15 +965,48 @@
     function showAlert(text, color) { let box = document.getElementById('alert-box'); let textEl = document.getElementById('alert-text'); textEl.innerText = text; textEl.style.color = color; box.classList.add('alert-show'); }
     
     async function showChampion(team) { 
+        // Update Series Score
+        if (team.name === match.teamA.name) seriesWinsA++;
+        else seriesWinsB++;
+
         let overlay = document.getElementById('champion-overlay'); let teamBox = document.getElementById('champ-team-box');
         teamBox.innerHTML = `<div class="marble-flag">${team.flag}</div> ${team.name}`; overlay.classList.add('show');
-        sfx.champion(); sfx.cheer(); speak(`We have a champion! Congratulations to ${team.name}!`);
+        sfx.cheer(); speak(`We have a champion! Congratulations to ${team.name}!`);
         let emojis = ['🏆', '🥇', '✨', '🎉', team.flag];
         for(let i=0; i<40; i++) {
             let el = document.createElement('div'); el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
             el.className = 'falling-item'; el.style.left = Math.random() * 100 + 'vw';
             el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = (Math.random() * 2) + 's'; overlay.appendChild(el);
         }
+    }
+
+    // --- PLAY AGAIN SYSTEM ---
+    async function playAgain() {
+        sfx.pop();
+        
+        // Hide Champion Overlay & clear old falling emojis
+        document.getElementById('champion-overlay').classList.remove('show');
+        document.querySelectorAll('.falling-item').forEach(e => e.remove());
+        
+        // Show Series Record panel
+        document.getElementById('ss-p1-text').innerText = `${p1Team.name}: ${seriesWinsA} WINS`;
+        document.getElementById('ss-p2-text').innerText = `${p2Team.name}: ${seriesWinsB} WINS`;
+        let ssPanel = document.getElementById('series-score');
+        ssPanel.classList.add('show');
+        
+        // Hide after 4 seconds
+        setTimeout(() => { ssPanel.classList.remove('show'); }, 4000);
+
+        // NAYA: Host le matra database bata purano moves clear garchha taaki conflict nahos
+        if(gameMode === 'ONLINE' && myRole === 'p1') {
+            await window.dbSet(window.dbRef(window.db, `rooms/${currentRoomId}/moves`), null);
+        }
+        
+        // Sanu delay dine jisse P2 le P1 ko clear huna time paos
+        await delay(500);
+        
+        // Fheri naya match suru
+        startMatch();
     }
 </script>
 </body>
