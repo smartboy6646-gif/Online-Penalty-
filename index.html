@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FIFA SHOOTOUT - MULTIPLAYER</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto+Condensed:wght@400;700&display=swap');
+
+    :root {
+        --pitch-dark: #197a30;
+        --pitch-light: #1f8e38;
+        --gold: #f8ca25;
+        --ui-bg: #111111;
+        --text: #ffffff;
+        --red: #ff3b30;
+        --green: #4ade80;
+        --p1-color: #4ade80;
+        --p2-color: #ff3b30;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-touch-callout: none; }
+
+    body { background-color: #000; color: var(--text); font-family: 'Roboto Condensed', Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100dvh; overflow: hidden; width: 100vw; }
+
+    #game-container { 
+        position: relative; width: 100%; max-width: 100%; height: 100%; 
+        background: url('https://images.unsplash.com/photo-1518605368461-1ee7c1626084?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80') center top / cover no-repeat;
+        display: flex; flex-direction: column; overflow: hidden; 
+    }
+
+    /* HEADER */
+    #header { 
+        background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-bottom: 1px solid rgba(255,255,255,0.1); 
+    }
+    .header-col { display: flex; flex-direction: column; justify-content: center; }
+    .header-title { font-family: 'Oswald', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; text-shadow: 1px 1px 2px #000; }
+    .header-subtitle { font-size: 0.6rem; color: #ddd; text-transform: uppercase; text-shadow: 1px 1px 2px #000;}
+    .tourney-pill { background-color: rgba(26, 26, 26, 0.8); padding: 4px 15px; border-radius: 12px; text-align: center; line-height: 1.1; border: 1px solid rgba(255,255,255,0.2); }
+    .tourney-name { font-size: 0.6rem; color: #fff; font-weight: bold; }
+    .tourney-type { font-size: 0.55rem; color: var(--gold); font-weight: bold; }
+
+    /* SCOREBOARD */
+    #scoreboard { 
+        background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px); padding: 12px 10px 8px 10px; display: flex; flex-direction: column; border-bottom: 2px solid rgba(255, 255, 255, 0.1); z-index: 10; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .score-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .team-info { display: flex; align-items: flex-start; width: 38%; gap: 8px; }
+    .team-info.right { flex-direction: row-reverse; text-align: right; }
+    .flag-box { width: 28px; height: 20px; background: #fff; border-radius: 2px; display: flex; justify-content: center; align-items: center; font-size: 18px; overflow: hidden; margin-top: 2px; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+    .team-details { display: flex; flex-direction: column; width: 100%; }
+    .team-name { font-family: 'Oswald', sans-serif; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; text-shadow: 1px 1px 2px #000;}
+    .team-info.left .team-name { color: var(--p1-color); }
+    .team-info.right .team-name { color: var(--p2-color); }
+    .team-stats { font-size: 0.55rem; color: #ccc; display: flex; align-items: center; gap: 3px; text-shadow: 1px 1px 2px #000;}
+    .team-info.right .team-stats { justify-content: flex-end; }
+    .history-dots { display: flex; gap: 3px; margin-top: 5px; height: 14px; }
+    .team-info.right .history-dots { justify-content: flex-end; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; background: rgba(51, 51, 51, 0.8); display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; color: white; border: 1px solid rgba(255,255,255,0.2); }
+    .dot.goal { background: #28a745; border-color: #fff; } .dot.miss { background: var(--red); border-color: #fff; }
+    .score-center { display: flex; flex-direction: column; align-items: center; width: 24%; }
+    .score-numbers { font-family: 'Oswald', sans-serif; font-size: 1.8rem; font-weight: 700; color: var(--gold); line-height: 1; letter-spacing: 1px; text-shadow: 2px 2px 4px #000; }
+    .next-shooter-text { font-size: 0.55rem; color: #ddd; margin-top: 6px; text-transform: uppercase; text-align: center; white-space: nowrap; text-shadow: 1px 1px 2px #000;}
+
+    /* PITCH & GOAL */
+    #pitch { flex: 1; position: relative; background: repeating-linear-gradient(90deg, var(--pitch-dark), var(--pitch-dark) 12.5%, var(--pitch-light) 12.5%, var(--pitch-light) 25%); perspective: 1000px; overflow: hidden; box-shadow: 0 -5px 15px rgba(0,0,0,0.5) inset; }
+    .pitch-line { position: absolute; border: 2px solid rgba(255,255,255,0.4); }
+    .goal-line-h { top: 20%; left: 0%; width: 100%; border-bottom: none; border-left: none; border-right: none; }
+    .penalty-box { top: 20%; left: 14%; width: 72%; height: 18%; border-top: none; }
+    .penalty-spot { top: 45%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.9); border-radius: 50%; transform: translate(-50%, -50%); border: none; }
+    .half-way-line { top: 60%; left: 0%; width: 100%; border-bottom: none; border-left: none; border-right: none; }
+    .penalty-arc { top: 60%; left: 35%; width: 30%; height: 12%; border-top: none; border-radius: 0 0 100px 100px; }
+
+    #goal { position: absolute; top: 2%; left: 26%; width: 48%; height: 18%; z-index: 1; }
+    .goal-frame-top { position: absolute; top: 0; left: 0; width: 100%; height: 6px; background: #fff; border: 2px solid #555; z-index: 4; border-radius: 2px; }
+    .goal-frame-left { position: absolute; top: 0; left: -3px; width: 6px; height: 100%; background: #fff; border: 2px solid #555; z-index: 4; border-radius: 2px; }
+    .goal-frame-right { position: absolute; top: 0; right: -3px; width: 6px; height: 100%; background: #fff; border: 2px solid #555; z-index: 4; border-radius: 2px; }
+    @keyframes shakeGoal { 0% { transform: translateX(0); } 20% { transform: translateX(-3px) translateY(1px); } 40% { transform: translateX(3px) translateY(-1px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } 100% { transform: translateX(0); } } .shake { animation: shakeGoal 0.4s ease-in-out; }
+
+    #queue-wrapper { position: absolute; top: 63%; left: 0; width: 100%; display: flex; justify-content: center; gap: 40px; z-index: 3; }
+    .queue-team { display: flex; gap: 4px; } #teamA-queue { justify-content: flex-end; } #teamB-queue { justify-content: flex-start; }
+    .marble-flag { width: 22px; height: 22px; border-radius: 50%; background: #fff; display: flex; justify-content: center; align-items: center; font-size: 14px; border: 1.5px solid #fff; box-shadow: 0 3px 5px rgba(0,0,0,0.5), inset -2px -2px 3px rgba(0,0,0,0.3); overflow: hidden; line-height: 1; }
+
+    /* MENUS */
+    #controls-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 200; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; backdrop-filter: blur(5px); }
+    .menu-title { font-family: 'Oswald', sans-serif; font-size: 2.8rem; color: var(--gold); margin-bottom: 25px; line-height: 1.1; text-shadow: 2px 2px 5px #000; text-transform: uppercase; }
+    
+    .btn-main { background: linear-gradient(to bottom, #28a745, #1e7e34); color: white; border: 2px solid var(--gold); padding: 15px 25px; font-size: 1.2rem; font-family: 'Oswald', sans-serif; border-radius: 5px; cursor: pointer; margin: 10px 0; width: 85%; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+    .btn-online { background: linear-gradient(to bottom, #007bff, #0056b3); border-color: #fff; }
+    .btn-main:active { transform: scale(0.95); } 
+    .btn-secondary { background: linear-gradient(to bottom, #444, #222); border-color: #666; padding: 10px; font-size: 0.9rem; font-family: 'Oswald', sans-serif; color: white; border-radius: 5px; cursor: pointer;}
+    .settings-row { display: flex; justify-content: space-between; width: 85%; margin-top: 20px; gap: 10px; } 
+    .settings-row button { width: 50%; margin: 0; }
+    .hidden { display: none !important; }
+
+    #matchmaking-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 250; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .loading-spinner { border: 6px solid #333; border-top: 6px solid #007bff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    #team-select-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%); z-index: 190; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    #ts-title { font-family: 'Oswald', sans-serif; font-size: 2rem; color: #fff; text-shadow: 0 0 10px var(--gold); margin-bottom: 10px; text-transform: uppercase; text-align: center; }
+    #team-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; max-width: 500px; overflow-y: auto; padding-bottom: 20px; -webkit-overflow-scrolling: touch; }
+    @media(max-width: 400px) { #team-grid { grid-template-columns: repeat(3, 1fr); } }
+    .team-btn { background: #111; border: 2px solid #444; border-radius: 8px; padding: 10px 5px; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.2s; }
+    .team-btn:active { transform: scale(0.95); } .team-btn.picked { opacity: 0.3; pointer-events: none; border-color: #000; }
+    .team-btn .t-flag { font-size: 1.8rem; line-height: 1; margin-bottom: 5px; }
+    .team-btn .t-name { font-size: 0.65rem; color: #fff; font-weight: bold; text-align: center; text-transform: uppercase; }
+
+    /* UI FIX: BANNER MOVED DOWN (was 30%, now 40%) */
+    #turn-banner { position: absolute; top: 40%; left: 50%; transform: translateX(-50%); z-index: 150; text-align: center; display: none; width: 100%; pointer-events: none; }
+    #turn-banner.show { display: block; animation: popBanner 0.3s ease-out; }
+    @keyframes popBanner { 0% { transform: translate(-50%, -10px) scale(0.9); opacity: 0; } 100% { transform: translate(-50%, 0) scale(1); opacity: 1; } }
+    #turn-banner-title { font-family: 'Oswald', sans-serif; font-size: 1.8rem; color: #fff; line-height: 1.1; margin-bottom: 5px; text-shadow: 2px 2px 6px rgba(0,0,0,1), -1px -1px 3px rgba(0,0,0,0.8); }
+    #turn-banner-sub { font-size: 0.95rem; color: #fff; text-transform: uppercase; font-weight: bold; text-shadow: 1px 1px 4px rgba(0,0,0,1); }
+    
+    /* UI FIX: TIMER MOVED DOWN slightly to avoid goal (was 22%, now 26%) */
+    #timer-display { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); font-family: 'Oswald', sans-serif; font-size: 4rem; color: #fff; text-shadow: 0 0 15px var(--red), 0 0 5px var(--red); z-index: 155; display: none; line-height: 1;}
+
+    /* ACCURACY BAR (TALA SAREKO & SCREEN TAP OVERLAY) */
+    #accuracy-container {
+        position: absolute; top: 72%; left: 50%; transform: translateX(-50%); 
+        width: 65%; height: 22px; border: 2px solid #fff; border-radius: 12px;
+        background: linear-gradient(to right, var(--red) 0%, var(--red) 35%, var(--green) 35%, var(--green) 65%, var(--red) 65%, var(--red) 100%);
+        z-index: 160; box-shadow: 0 5px 15px rgba(0,0,0,0.8); display: none; overflow: hidden;
+    }
+    #accuracy-cursor {
+        position: absolute; top: -2px; left: 0%; width: 4px; height: 26px;
+        background: #fff; border: 1px solid #000; box-shadow: 0 0 5px rgba(0,0,0,0.8);
+        transform: translateX(-50%);
+    }
+
+    /* INVISIBLE OVERLAY TO CAPTURE TAP ANYWHERE */
+    #tap-overlay {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        z-index: 155; display: none; cursor: pointer;
+    }
+
+    /* GOAL TARGETS */
+    #goal-targets { position: absolute; top: 2%; left: 26%; width: 48%; height: 18%; z-index: 150; display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 3px; }
+    #goal-targets.hidden { display: none !important; }
+    .g-target { display: flex; align-items: center; justify-content: center; font-size: 38px; color: white; cursor: pointer; transition: all 0.2s; text-shadow: 0 4px 6px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6); }
+    .g-target:hover { transform: scale(1.25); z-index: 10; color: var(--gold); }
+    .g-target:active { transform: scale(0.9); }
+    .g-target.tl { grid-area: 1 / 1 / 2 / 2; } .g-target.tr { grid-area: 1 / 3 / 2 / 4; }
+    .g-target.bl { grid-area: 2 / 1 / 3 / 2; } .g-target.bc { grid-area: 2 / 2 / 3 / 3; } .g-target.br { grid-area: 2 / 3 / 3 / 4; }
+
+    /* PLAYER MODELS */
+    .player-model { position: relative; display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 5px 4px rgba(0,0,0,0.5)); }
+    .player-model .marble-flag { position: relative; width: 33px; height: 33px; font-size: 20px; z-index: 3; }
+    .face { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+    .eyes { display: flex; gap: 6px; margin-top: -3px; } .eye { width: 7px; height: 7px; background: #000; border-radius: 50%; border: 2px solid #fff; box-sizing: border-box; }
+    .mouth { width: 10px; height: 3px; background: #000; border-radius: 3px; margin-top: 3px; border: 2px solid #fff; box-sizing: content-box; }
+    .face.happy .mouth { width: 12px; height: 6px; border-radius: 0 0 12px 12px; margin-top: 1px; } .face.sad .mouth { width: 12px; height: 3px; border-radius: 12px 12px 0 0; margin-top: 4px; } .face.sad .eye { height: 3px; margin-top: 3px; border-radius: 3px; }
+    .player-body { width: 15px; height: 21px; background: linear-gradient(135deg, #ffffff, #aaaaaa); border: 1px solid #555; border-radius: 6px; margin-top: -4px; z-index: 2; transition: transform 0.2s; }
+    .player-arms { position: absolute; top: 29px; width: 30px; display: flex; justify-content: space-between; z-index: 1; }
+    .player-arm { width: 6px; height: 16px; background: linear-gradient(135deg, #ffffff, #aaaaaa); border: 1px solid #555; border-radius: 3px; transition: transform 0.2s ease, top 0.2s; }
+    .player-arm.left { transform: rotate(20deg); } .player-arm.right { transform: rotate(-20deg); }
+    .player-legs { display: flex; gap: 5px; margin-top: -3px; z-index: 1; transition: gap 0.2s; }
+    .player-leg { width: 6px; height: 18px; background: linear-gradient(135deg, #333, #111); border-radius: 3px; transition: transform 0.15s ease; transform-origin: top center; }
+
+    @keyframes breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } } .idle-breathe { animation: breathe 1.2s ease-in-out infinite; }
+    @keyframes keeperReady { 0%, 100% { transform: translateX(0) scaleY(1); } 25% { transform: translateX(-4px) scaleY(0.95); } 75% { transform: translateX(4px) scaleY(0.95); } } .keeper-ready { animation: keeperReady 1s ease-in-out infinite; }
+    @keyframes kick-r-4 { 0% { transform: rotate(0); } 50% { transform: rotate(80deg); } 100% { transform: rotate(60deg); } } 
+    @keyframes kick-l-4 { 0% { transform: rotate(0); } 50% { transform: rotate(-80deg); } 100% { transform: rotate(-60deg); } }
+    .kick-r-4 .player-leg.right { animation: kick-r-4 0.25s forwards ease-in-out; } .kick-r-4 .player-body { transform: rotate(-12deg); }
+    .kick-l-4 .player-leg.left { animation: kick-l-4 0.25s forwards ease-in-out; } .kick-l-4 .player-body { transform: rotate(12deg); }
+    .diving .player-arm.left { transform: rotate(110deg) translateY(-7px) translateX(-6px); } .diving .player-arm.right { transform: rotate(-110deg) translateY(-7px) translateX(6px); } .diving .player-legs { gap: 15px; } .diving .player-leg.left { transform: rotate(35deg); } .diving .player-leg.right { transform: rotate(-35deg); }
+    .diving-high .player-arm.left { transform: rotate(160deg) translateY(-15px) translateX(-6px); } .diving-high .player-arm.right { transform: rotate(-160deg) translateY(-15px) translateX(6px); } .diving-high .player-legs { gap: 12px; } .diving-high .player-leg.left { transform: rotate(25deg); } .diving-high .player-leg.right { transform: rotate(-25deg); }
+    @keyframes jumpCelebrate { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } } 
+    .celebrating { animation: jumpCelebrate 0.4s ease-in-out infinite; } .celebrating .player-arm.left { transform: rotate(150deg) translateY(-3px); } .celebrating .player-arm.right { transform: rotate(-150deg) translateY(-3px); }
+    .sad-anim .player-arm.left { transform: rotate(10deg); } .sad-anim .player-arm.right { transform: rotate(-10deg); } .sad-anim .marble-flag { transform: rotate(15deg); } 
+
+    #goalkeeper { position: absolute; top: 15%; left: 50%; transform: translate3d(-50%, -50%, 0); z-index: 3; will-change: transform, left, opacity; transition: opacity 0.3s; }
+    #shooter { position: absolute; z-index: 4; will-change: transform, left, top, opacity; opacity: 0; transition: opacity 0.3s; }
+    
+    #ball { position: absolute; top: 45%; left: 50%; width: 22px; height: 22px; border-radius: 50%; transform: translate3d(-50%, -50%, 0); z-index: 2; will-change: transform, left, top, opacity; transition: opacity 0.3s; }
+    #ball-inner { font-size: 22px; line-height: 1; display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6)); }
+    @keyframes spinBall { 0% { transform: rotate(0deg); } 100% { transform: rotate(1080deg); } } .spin { animation: spinBall 0.4s linear forwards; }
+    #explosion { position: absolute; font-size: 3.5rem; z-index: 10; opacity: 0; pointer-events: none; transform: translate(-50%, -50%) scale(0); filter: drop-shadow(0px 0px 10px #ff0); }
+    .explode-anim { animation: popExplosion 0.5s ease-out forwards; }
+    @keyframes popExplosion { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 40% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+
+    #alert-box { position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%) scale(0); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 20; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events: none; }
+    .alert-show { transform: translate(-50%, -50%) scale(1) !important; }
+    #alert-text { font-family: 'Oswald', sans-serif; font-size: 3.5rem; font-weight: 700; color: #fff; line-height: 1; text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 10px 15px rgba(0,0,0,0.8); letter-spacing: 2px; text-transform: uppercase; white-space: nowrap; text-align: center; }
+
+    /* CHAMPION SCREEN */
+    #champion-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #3a3200 0%, #000000 100%); z-index: 500; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: opacity 1s ease-in; overflow: hidden; }
+    #champion-overlay.show { opacity: 1; pointer-events: auto; }
+    .champ-title { font-family: 'Oswald', sans-serif; font-size: 4.5rem; color: var(--gold); text-shadow: 0 0 20px #f8ca25, 0 0 40px #f8ca25; animation: pulseGlow 1s infinite alternate; margin-bottom: 20px; line-height: 1; }
+    .champ-team { font-family: 'Oswald', sans-serif; font-size: 2.5rem; color: #fff; display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.1); padding: 10px 30px; border-radius: 50px; border: 2px solid var(--gold); box-shadow: 0 0 20px rgba(248,202,37,0.8); z-index: 502;}
+    .champ-btn { margin-top: 30px; z-index: 502; background: linear-gradient(to bottom, #d4af37, #aa8015); border: 2px solid #fff; box-shadow: 0 0 15px rgba(255,255,255,0.5); width: 60%; font-size: 1.5rem; padding: 15px; border-radius: 5px; color: white; cursor: pointer; text-transform: uppercase; font-family: 'Oswald';}
+    .falling-item { position: absolute; font-size: 2rem; animation: fall linear infinite; z-index: 501; pointer-events: none; }
+    @keyframes pulseGlow { 0% { transform: scale(1); filter: brightness(1); } 100% { transform: scale(1.1); filter: brightness(1.3); text-shadow: 0 0 30px #f8ca25, 0 0 60px #f8ca25, 0 0 90px #fff; } }
+    @keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- MAIN MENU -->
+    <div id="controls-overlay">
+        <h1 class="menu-title">FIFA SHOOTOUT</h1>
+        
+        <button class="btn-main btn-online" onclick="selectMode('ONLINE')">🌐 ONLINE MULTIPLAYER</button>
+        <button class="btn-main" onclick="selectMode('LOCAL')">🎮 PASS N PLAY (LOCAL)</button>
+        
+        <div class="settings-row">
+            <button id="btn-sound" class="btn-secondary" onclick="toggleSound()">🔊 Sound: ON</button>
+            <button id="btn-tts" class="btn-secondary" onclick="toggleTTS()">🗣️ TTS: ON</button>
+        </div>
+    </div>
+
+    <!-- MATCHMAKING SCREEN (FOR ONLINE MODE) -->
+    <div id="matchmaking-screen" class="hidden">
+        <div class="loading-spinner"></div>
+        <h2 style="font-family:'Oswald'; color:#fff; letter-spacing:1px;" id="mm-text">SEARCHING OPPONENT...</h2>
+    </div>
+
+    <!-- TEAM SELECTION SCREEN -->
+    <div id="team-select-screen" class="hidden">
+        <h2 id="ts-title">SELECT TEAM</h2>
+        <div id="team-grid"></div>
+    </div>
+
+    <!-- TIMERS AND BANNERS -->
+    <div id="timer-display">5</div>
+    
+    <div id="turn-banner">
+        <div id="turn-banner-title">SHOOTER TURN</div>
+        <div id="turn-banner-sub">Pick target</div>
+    </div>
+
+    <!-- INVISIBLE OVERLAY TO CATCH SCREEN TAPS FOR BAR -->
+    <div id="tap-overlay" onclick="onScreenTap()"></div>
+
+    <div id="accuracy-container">
+        <div id="accuracy-cursor"></div>
+    </div>
+
+    <!-- CHAMPION SCREEN -->
+    <div id="champion-overlay">
+        <div class="champ-title">CHAMPION</div>
+        <div class="champ-team" id="champ-team-box"></div>
+        <button class="champ-btn" onclick="location.reload()">🔄 PLAY AGAIN</button>
+    </div>
+
+    <!-- HEADER -->
+    <div id="header">
+        <div class="header-col header-col-left">
+            <div class="header-title">MULTIPLAYER</div>
+            <div class="header-subtitle" id="top-mode-text">PASS N PLAY</div>
+        </div>
+        <div class="header-col header-col-center">
+            <div class="tourney-pill">
+                <span class="tourney-name">HEAD TO HEAD</span><br>
+                <span class="tourney-type">PENALTY SHOOTOUT</span>
+            </div>
+        </div>
+        <div class="header-col header-col-right" style="text-align:right;">
+            <div class="header-title">P1 VS P2</div>
+        </div>
+    </div>
+
+    <!-- SCOREBOARD -->
+    <div id="scoreboard">
+        <div class="score-row">
+            <div class="team-info left" id="teamA-info">
+                <div class="flag-box" id="flagA">⚽</div>
+                <div class="team-details">
+                    <div class="team-name" id="nameA">P1 TEAM</div>
+                    <div class="team-stats"><span>🛡️</span> <span id="kicksA-txt">0</span> kicks taken</div>
+                    <div class="history-dots" id="dotsA"></div>
+                </div>
+            </div>
+            <div class="score-center">
+                <div class="score-numbers"><span id="scoreA">0</span> - <span id="scoreB">0</span></div>
+            </div>
+            <div class="team-info right" id="teamB-info">
+                <div class="flag-box" id="flagB">⚽</div>
+                <div class="team-details">
+                    <div class="team-name" id="nameB">P2 TEAM</div>
+                    <div class="team-stats"><span>🛡</span> <span id="kicksB-txt">0</span> kicks taken</div>
+                    <div class="history-dots" id="dotsB"></div>
+                </div>
+            </div>
+        </div>
+        <div class="next-shooter-text">WAITING TO START...</div>
+    </div>
+
+    <!-- PITCH -->
+    <div id="pitch">
+        <div class="pitch-line goal-line-h"></div>
+        <div class="pitch-line penalty-box"></div>
+        <div class="pitch-line half-way-line"></div>
+        <div class="pitch-line penalty-arc"></div>
+        <div class="pitch-line penalty-spot"></div>
+        
+        <div id="goal">
+            <svg width="100%" height="100%" style="position:absolute; top:0; left:0; z-index: 1; overflow: visible;">
+                <pattern id="net" width="8" height="8" patternUnits="userSpaceOnUse">
+                    <rect width="8" height="8" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.65"/>
+                </pattern>
+                <rect x="12%" y="30%" width="76%" height="55%" fill="url(#net)" />
+                <polygon points="0,0 12%,30% 12%,85% 0,100%" fill="url(#net)" />
+                <polygon points="100%,0 88%,30% 88%,85% 100%,100%" fill="url(#net)" />
+                <polygon points="0,0 100%,0 88%,30% 12%,30%" fill="url(#net)" />
+                <line x1="12%" y1="30%" x2="88%" y2="30%" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                <line x1="12%" y1="85%" x2="88%" y2="85%" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                <line x1="12%" y1="30%" x2="12%" y2="85%" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                <line x1="88%" y1="30%" x2="88%" y2="85%" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+                <line x1="0" y1="0" x2="12%" y2="30%" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+                <line x1="100%" y1="0" x2="88%" y2="30%" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+                <line x1="0" y1="100%" x2="12%" y2="85%" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+                <line x1="100%" y1="100%" x2="88%" y2="85%" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+            </svg>
+            <div class="goal-frame-top"></div>
+            <div class="goal-frame-left"></div>
+            <div class="goal-frame-right"></div>
+        </div>
+
+        <div id="goal-targets" class="hidden">
+            <div class="g-target tl" onclick="onTargetClick(-1, 1)">↖</div>
+            <div class="g-target tr" onclick="onTargetClick(1, 1)">↗</div>
+            <div class="g-target bl" onclick="onTargetClick(-1, 0)">↙</div>
+            <div class="g-target bc" onclick="onTargetClick(0, 0)">⏺</div>
+            <div class="g-target br" onclick="onTargetClick(1, 0)">↘</div>
+        </div>
+
+        <div id="queue-wrapper">
+            <div id="teamA-queue" class="queue-team"></div>
+            <div id="teamB-queue" class="queue-team"></div>
+        </div>
+
+        <div id="goalkeeper"></div> 
+        <div id="ball"><div id="ball-inner">⚽️</div></div>
+        <div id="shooter"></div>
+        
+        <div id="explosion">💥</div>
+        <div id="alert-box"><div id="alert-text">GOAL!</div></div>
+    </div>
+</div>
+
+<!-- FIREBASE SDK SETUP -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBtCvg3GujBPoSFVoRpnh6gny9qfM1FK0g",
+        authDomain: "playerpenalty-b3c21.firebaseapp.com",
+        projectId: "playerpenalty-b3c21",
+        storageBucket: "playerpenalty-b3c21.firebasestorage.app",
+        messagingSenderId: "145708042309",
+        appId: "1:145708042309:web:0b2006339303b041bbfb2c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    // Ye functions global banaye hain taaki niche wali script unhe use kar sake
+    window.db = database;
+    window.dbRef = ref;
+    window.dbSet = set;
+    window.dbGet = get;
+    window.dbChild = child;
+    window.dbOnValue = onValue;
+</script>
+
+<script>
+    const TEAMS_32 = [
+        { name: "ARGENTINA", flag: "🇦🇷" }, { name: "FRANCE", flag: "🇫🇷" }, { name: "BRAZIL", flag: "🇧🇷" }, { name: "ENGLAND", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+        { name: "BELGIUM", flag: "🇧🇪" }, { name: "PORTUGAL", flag: "🇵🇹" }, { name: "NETHERLANDS", flag: "🇳🇱" }, { name: "SPAIN", flag: "🇪🇸" },
+        { name: "ITALY", flag: "🇮🇹" }, { name: "CROATIA", flag: "🇭🇷" }, { name: "URUGUAY", flag: "🇺🇾" }, { name: "USA", flag: "🇺🇸" },
+        { name: "MOROCCO", flag: "🇲🇦" }, { name: "COLOMBIA", flag: "🇨🇴" }, { name: "MEXICO", flag: "🇲🇽" }, { name: "GERMANY", flag: "🇩🇪" },
+        { name: "SENEGAL", flag: "🇸🇳" }, { name: "JAPAN", flag: "🇯🇵" }, { name: "SWITZERLAND", flag: "🇨🇭" }, { name: "IRAN", flag: "🇮🇷" },
+        { name: "DENMARK", flag: "🇩🇰" }, { name: "SOUTH KOREA", flag: "🇰🇷" }, { name: "AUSTRALIA", flag: "🇦🇺" }, { name: "UKRAINE", flag: "🇺🇦" },
+        { name: "AUSTRIA", flag: "🇦🇹" }, { name: "SWEDEN", flag: "🇸🇪" }, { name: "POLAND", flag: "🇵🇱" }, { name: "HUNGARY", flag: "🇭🇺" },
+        { name: "SERBIA", flag: "🇷🇸" }, { name: "WALES", flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" }, { name: "PERU", flag: "🇵🇪" }, { name: "SCOTLAND", flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }
+    ];
+
+    let audioCtx = null; let synth = window.speechSynthesis;
+    let settings = { sound: true, tts: true };
+    
+    let gameMode = 'LOCAL'; 
+    let p1Team = null; let p2Team = null;
+    let match = { teamA: null, teamB: null, scoreA: 0, scoreB: 0, kicksA: 0, kicksB: 0, turn: 'A', isSuddenDeath: false };
+    
+    let inputPhase = 'shot'; 
+    let userHasClicked = false;
+    let turnResolve = null; 
+    let currentPhaseResolver = null; 
+    let currentTimer = null;
+
+    let barAnimId;
+    let barX = 0; let barDir = 1; let isBarMoving = false;
+    let isWaitingForTap = false;
+
+    // --- Audio System ---
+    function initAudioEngine() {
+        if (!settings.sound) return;
+        try {
+            let AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!audioCtx) { audioCtx = new AudioContext(); }
+            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); gain.gain.value = 0;
+            osc.connect(gain); gain.connect(audioCtx.destination); osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.01);
+            let u = new SpeechSynthesisUtterance(''); u.volume = 0; synth.speak(u);
+        } catch (e) {}
+    }
+    function checkAudio() { if (!audioCtx) return false; if (audioCtx.state === 'suspended') audioCtx.resume(); return true; }
+    function toggleSound() { initAudioEngine(); settings.sound = !settings.sound; document.getElementById('btn-sound').innerText = settings.sound ? "🔊 Sound: ON" : "🔇 Sound: OFF"; }
+    function toggleTTS() { initAudioEngine(); settings.tts = !settings.tts; document.getElementById('btn-tts').innerText = settings.tts ? "🗣️ TTS: ON" : "🗣️ TTS: OFF"; }
+    function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+    function playNoiseFilter(duration, vol=0.1, type='lowpass', freq=1000) { if (!settings.sound || !checkAudio()) return; try { let bufferSize = audioCtx.sampleRate * duration; let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); let data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; let noise = audioCtx.createBufferSource(); noise.buffer = buffer; let filter = audioCtx.createBiquadFilter(); filter.type = type; filter.frequency.value = freq; let gain = audioCtx.createGain(); gain.gain.setValueAtTime(vol, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); noise.start(); } catch(e) {} }
+
+    const sfx = {
+        whistle: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let playPeep = (time, dur, f1, f2, v) => { let o1 = audioCtx.createOscillator(); let o2 = audioCtx.createOscillator(); let g = audioCtx.createGain(); o1.type = 'sine'; o2.type = 'sine'; o1.frequency.value = f1; o2.frequency.value = f2; g.gain.setValueAtTime(0, time); g.gain.linearRampToValueAtTime(v, time + 0.05); g.gain.setValueAtTime(v, time + dur - 0.05); g.gain.linearRampToValueAtTime(0, time + dur); o1.connect(g); o2.connect(g); g.connect(audioCtx.destination); o1.start(time); o2.start(time); o1.stop(time + dur); o2.stop(time + dur); }; playPeep(t, 0.15, 1200, 1250, 0.15); playPeep(t + 0.25, 0.4, 1200, 1250, 0.2); } catch(e) {} },
+        sharpWhistle: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let o = audioCtx.createOscillator(); let g = audioCtx.createGain(); o.type = 'square'; o.frequency.value = 2500; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.2, t + 0.05); g.gain.exponentialRampToValueAtTime(0.01, t + 0.4); o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t + 0.4); } catch(e) {} },
+        pop: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let osc = audioCtx.createOscillator(); let g = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(800, t); osc.frequency.exponentialRampToValueAtTime(1200, t + 0.1); g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.1); osc.connect(g); g.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.1); } catch(e) {} },
+        kick: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(300, t); osc.frequency.exponentialRampToValueAtTime(40, t + 0.1); gain.gain.setValueAtTime(1, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.15); playNoiseFilter(0.08, 0.6, 'highpass', 1200); } catch(e) {} },
+        net: () => playNoiseFilter(0.3, 0.7, 'highpass', 3000), 
+        save: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.type = 'square'; osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(50, t + 0.1); gain.gain.setValueAtTime(0.4, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.15); playNoiseFilter(0.15, 0.5, 'lowpass', 800); } catch(e) {} },
+        post: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; [800, 1200, 1600].forEach(f => { let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.type = 'sine'; osc.frequency.setValueAtTime(f, t); gain.gain.setValueAtTime(0.5, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.3); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.3); }); playNoiseFilter(0.1, 0.3, 'bandpass', 2000); } catch(e) {} },
+        cheer: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let bufferSize = audioCtx.sampleRate * 2.5; let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate); let data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1; let noise = audioCtx.createBufferSource(); noise.buffer = buffer; let filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.setValueAtTime(500, t); filter.frequency.linearRampToValueAtTime(1200, t + 1.0); let gain = audioCtx.createGain(); gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.5, t + 0.5); gain.gain.setValueAtTime(0.5, t + 1.5); gain.gain.exponentialRampToValueAtTime(0.01, t + 2.5); noise.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); noise.start(t); } catch(e) {} },
+        aww: () => { if (!settings.sound || !checkAudio()) return; try { let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.type = 'triangle'; osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 1.2); gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.2); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.2); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 1.2); } catch(e) {} },
+        win: () => { if (!settings.sound || !checkAudio()) return; try { let t = audioCtx.currentTime; let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.type = 'square'; [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => { osc.frequency.setValueAtTime(f, t + (i * 0.15)); }); gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(0.15, t + 0.05); gain.gain.setValueAtTime(0.15, t + 0.55); gain.gain.linearRampToValueAtTime(0, t + 1.0); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 1.0); } catch(e) {} }
+    };
+
+    function speak(text) {
+        if (!settings.tts) return; 
+        if (synth.speaking) synth.cancel(); 
+        let u = new SpeechSynthesisUtterance(text); u.rate = 1.2; u.pitch = 1.0; 
+        setTimeout(() => synth.speak(u), 0); 
+    }
+
+    // --- ACCURACY BAR LOGIC ---
+    function startBar() {
+        document.getElementById('accuracy-container').style.display = 'block';
+        document.getElementById('tap-overlay').style.display = 'block';
+        isWaitingForTap = true;
+        
+        barX = Math.random() * 100; isBarMoving = true;
+        
+        function animate() {
+            if(!isBarMoving) return;
+            barX += barDir * 1.5; 
+            if(barX >= 100) { barX = 100; barDir = -1; }
+            if(barX <= 0) { barX = 0; barDir = 1; }
+            document.getElementById('accuracy-cursor').style.left = barX + '%';
+            barAnimId = requestAnimationFrame(animate);
+        }
+        animate();
+    }
+    
+    function onScreenTap() {
+        if(!isWaitingForTap) return;
+        isWaitingForTap = false;
+        
+        sfx.pop();
+        document.getElementById('tap-overlay').style.display = 'none';
+        isBarMoving = false;
+        cancelAnimationFrame(barAnimId);
+        
+        let isGreen = (barX >= 35 && barX <= 65);
+        
+        if (currentPhaseResolver) {
+            let resolveFn = currentPhaseResolver;
+            currentPhaseResolver = null;
+            resolveFn(isGreen);
+        }
+    }
+
+    function hideBar() { 
+        document.getElementById('accuracy-container').style.display = 'none'; 
+        document.getElementById('tap-overlay').style.display = 'none';
+        isBarMoving = false;
+        isWaitingForTap = false;
+    }
+
+
+    // --- MENU SELECTION ---
+    function selectMode(mode) {
+        initAudioEngine();
+        gameMode = mode;
+        document.getElementById('controls-overlay').classList.add('hidden');
+        document.getElementById('top-mode-text').innerText = (mode === 'ONLINE') ? "ONLINE MATCH" : "PASS N PLAY";
+        
+        p1Team = null; p2Team = null;
+        document.getElementById('ts-title').innerHTML = `<span style="color:var(--p1-color)">PLAYER 1: SELECT TEAM</span>`;
+        document.getElementById('team-select-screen').classList.remove('hidden');
+        renderTeamSelect();
+    }
+
+    function renderTeamSelect() {
+        let grid = document.getElementById('team-grid');
+        grid.innerHTML = '';
+        
+        TEAMS_32.forEach((team) => {
+            let isPicked = (p1Team && p1Team.name === team.name);
+            let btn = document.createElement('div');
+            btn.className = `team-btn ${isPicked ? 'picked' : ''}`;
+            btn.innerHTML = `<div class="t-flag">${team.flag}</div><div class="t-name">${team.name}</div>`;
+            
+            btn.onclick = async () => {
+                sfx.pop();
+                if (!p1Team) {
+                    p1Team = team;
+                    if (gameMode === 'ONLINE') {
+                        document.getElementById('team-select-screen').classList.add('hidden');
+                        await findOpponent();
+                    } else {
+                        document.getElementById('ts-title').innerHTML = `<span style="color:var(--p2-color)">PLAYER 2: SELECT TEAM</span>`;
+                        renderTeamSelect();
+                    }
+                } else {
+                    p2Team = team;
+                    document.getElementById('team-select-screen').classList.add('hidden');
+                    startMatch();
+                }
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    async function findOpponent() {
+        let mm = document.getElementById('matchmaking-screen');
+        let txt = document.getElementById('mm-text');
+        mm.classList.remove('hidden');
+        txt.innerText = "SEARCHING OPPONENT...";
+        
+        // ---------------------------------------------------------
+        // Yahan par actual Matchmaking Logic aayega future mein:
+        // window.dbGet() use karke DB check karenge ki koi aur wait kar raha hai ya nahi.
+        // ---------------------------------------------------------
+        
+        await delay(2000); // Simulate network
+        
+        txt.innerText = "OPPONENT FOUND!";
+        sfx.whistle();
+        
+        let availableTeams = TEAMS_32.filter(t => t.name !== p1Team.name);
+        p2Team = availableTeams[Math.floor(Math.random() * availableTeams.length)];
+        
+        await delay(1500);
+        mm.classList.add('hidden');
+        startMatch();
+    }
+
+
+    // --- MATCH LOGIC ---
+    function populateQueues(teamA, teamB) {
+        let qa = document.getElementById('teamA-queue'); let qb = document.getElementById('teamB-queue'); qa.innerHTML = ''; qb.innerHTML = '';
+        for (let i = 0; i < 5; i++) { qa.innerHTML += `<div class="marble-flag">${teamA.flag}</div>`; qb.innerHTML += `<div class="marble-flag">${teamB.flag}</div>`; }
+    }
+
+    async function startMatch() {
+        match = { teamA: p1Team, teamB: p2Team, scoreA: 0, scoreB: 0, kicksA: 0, kicksB: 0, turn: 'A', isSuddenDeath: false };
+        document.getElementById('flagA').innerText = p1Team.flag; document.getElementById('nameA').innerText = p1Team.name;
+        document.getElementById('flagB').innerText = p2Team.flag; document.getElementById('nameB').innerText = p2Team.name;
+        document.getElementById('dotsA').innerHTML = ''; document.getElementById('dotsB').innerHTML = '';
+        
+        populateQueues(p1Team, p2Team); updateScoreUI();
+        speak(`Match starting. ${p1Team.name} versus ${p2Team.name}.`); 
+        await delay(1500);
+
+        while (true) {
+            let currentTeam = match.turn === 'A' ? match.teamA : match.teamB; 
+            let defendingTeam = match.turn === 'A' ? match.teamB : match.teamA;
+            let playerRole = match.turn === 'A' ? "P1" : "P2";
+            let keeperRole = match.turn === 'A' ? "P2" : "P1";
+            let pColor = match.turn === 'A' ? "var(--p1-color)" : "var(--p2-color)";
+            let kColor = match.turn === 'A' ? "var(--p2-color)" : "var(--p1-color)";
+            
+            document.querySelector('.next-shooter-text').innerHTML = `NEXT: <span style="color:${pColor}">${playerRole} (${currentTeam.name})</span> TO SHOOT`;
+
+            let qStartLeft = match.turn === 'A' ? '20%' : '80%';
+            let qQueue = match.turn === 'A' ? document.getElementById('teamA-queue') : document.getElementById('teamB-queue');
+            if (qQueue.children.length > 0) qQueue.removeChild(match.turn === 'A' ? qQueue.lastElementChild : qQueue.firstElementChild);
+
+            await resetPitch(qStartLeft, '62%', currentTeam.flag, defendingTeam.flag);
+            
+            let s = document.getElementById('shooter'); let sModel = s.querySelector('.player-model');
+            sModel.classList.remove('idle-breathe'); s.classList.add('walking');
+            s.style.transition = 'top 0.8s linear, left 0.8s linear'; s.style.top = '52%'; s.style.left = '50%';
+            await delay(800); s.classList.remove('walking'); sModel.classList.add('idle-breathe');
+            
+            // --- GET INPUT BASED ON MODE ---
+            let shotData;
+            if (gameMode === 'LOCAL') {
+                shotData = await getLocalInput(currentTeam, defendingTeam, playerRole, keeperRole, pColor, kColor);
+            } else {
+                shotData = await getOnlineInput(match.turn === 'A', currentTeam, defendingTeam);
+            }
+            
+            speak(`${currentTeam.name} steps up.`, true);
+            await delay(800); 
+            sfx.whistle(); await delay(600);
+
+            sModel.classList.remove('idle-breathe'); sModel.classList.add('running');
+            s.style.transition = 'top 0.4s cubic-bezier(0.25, 1, 0.5, 1), left 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
+            s.style.top = '47%'; s.style.left = (shotData.foot === 'r') ? '48%' : '52%'; 
+            await delay(400); sModel.classList.remove('running');
+            
+            await executeKickAnimation(shotData); 
+            handleResult(shotData.result, shotData.shot.y === 1);
+            
+            await delay(2000); 
+            s.style.opacity = '0'; await delay(1000);
+
+            let winner = checkWinCondition(); if (winner) break;
+            
+            if (match.turn === 'A') { match.turn = 'B'; } else { 
+                match.turn = 'A'; 
+                if (match.kicksA === 5 && match.scoreA === match.scoreB && !match.isSuddenDeath) { 
+                    match.isSuddenDeath = true; sfx.sharpWhistle(); showAlert("SUDDEN DEATH!", "#ff0000"); speak("Sudden Death!", true); await delay(3000);
+                } 
+            }
+            document.getElementById('alert-box').classList.remove('alert-show');
+        }
+
+        let winner = match.scoreA > match.scoreB ? match.teamA : match.teamB;
+        document.getElementById('alert-box').classList.remove('alert-show');
+        document.getElementById('shooter').style.opacity = '0'; document.getElementById('goalkeeper').style.opacity = '0'; document.getElementById('ball').style.opacity = '0';
+        
+        await showChampion(winner);
+    }
+
+
+    function onTargetClick(x, y) {
+        if(!userHasClicked && turnResolve) {
+            userHasClicked = true;
+            sfx.pop();
+            
+            if(currentTimer) clearInterval(currentTimer);
+            document.getElementById('timer-display').style.display = 'none';
+            document.getElementById('goal-targets').classList.add('hidden');
+            
+            let chosenTarget = {x, y};
+
+            if (inputPhase === 'shot') {
+                document.getElementById('turn-banner-sub').innerText = "TAP ANYWHERE TO STOP BAR!";
+                
+                currentPhaseResolver = (isGreen) => {
+                    hideBar();
+                    if(gameMode === 'ONLINE') {
+                        submitOnlineMove({ type: 'shot', target: chosenTarget, isGreen: isGreen });
+                    } else {
+                        turnResolve({ target: chosenTarget, isGreen: isGreen });
+                    }
+                };
+                startBar(); 
+                
+            } else {
+                if(gameMode === 'ONLINE') {
+                    submitOnlineMove({ type: 'dive', target: chosenTarget });
+                } else {
+                    turnResolve({ target: chosenTarget });
+                }
+            }
+        }
+    }
+
+    function getLocalInput(shooter, keeper, pRole, kRole, pColor, kColor) {
+        return new Promise(async resolve => {
+            let banner = document.getElementById('turn-banner'); let title = document.getElementById('turn-banner-title'); let sub = document.getElementById('turn-banner-sub'); let targetOverlay = document.getElementById('goal-targets');
+            banner.classList.add('show'); targetOverlay.classList.remove('hidden');
+            
+            inputPhase = 'shot'; userHasClicked = false;
+            title.innerHTML = `<span style="color:${pColor}">${pRole}: ${shooter.name} (SHOOTER)</span>`;
+            sub.innerText = `Pick target (Then tap to stop bar)`;
+            
+            let shotResult = await new Promise(res => { turnResolve = res; });
+            banner.classList.remove('show');
+            await delay(1000);
+            
+            inputPhase = 'dive'; userHasClicked = false;
+            banner.classList.add('show'); targetOverlay.classList.remove('hidden');
+            title.innerHTML = `<span style="color:${kColor}">${kRole}: ${keeper.name} (KEEPER)</span>`;
+            sub.innerText = `Pick dive direction on goal`;
+            
+            let diveResult = await new Promise(res => { turnResolve = res; });
+            banner.classList.remove('show'); turnResolve = null;
+
+            resolve(calculateResult(shotResult.target, diveResult.target, shotResult.isGreen));
+        });
+    }
+
+    function getOnlineInput(isUserShooter, shooter, keeper) {
+        return new Promise(resolve => {
+            let banner = document.getElementById('turn-banner'); let title = document.getElementById('turn-banner-title'); let sub = document.getElementById('turn-banner-sub'); let targetOverlay = document.getElementById('goal-targets'); let timer = document.getElementById('timer-display');
+            
+            banner.classList.add('show'); targetOverlay.classList.remove('hidden'); timer.style.display = 'block';
+            userHasClicked = false;
+            
+            let pColor = isUserShooter ? "var(--p1-color)" : "var(--p2-color)";
+            title.innerHTML = `<span style="color:${pColor}">YOUR TURN (${isUserShooter ? 'SHOOTER' : 'KEEPER'})</span>`;
+            
+            if (isUserShooter) {
+                inputPhase = 'shot'; sub.innerText = `Pick target before time runs out!`;
+            } else {
+                inputPhase = 'dive'; sub.innerText = `Pick dive direction before time runs out!`;
+            }
+
+            let timeLeft = 5; timer.innerText = timeLeft;
+            
+            turnResolve = resolve; 
+            
+            currentTimer = setInterval(() => {
+                timeLeft--;
+                if(timeLeft > 0) { 
+                    timer.innerText = timeLeft; sfx.pop(); 
+                } else {
+                    clearInterval(currentTimer);
+                    timer.style.display = 'none';
+                    targetOverlay.classList.add('hidden');
+                    
+                    if(!userHasClicked) {
+                        userHasClicked = true;
+                        hideBar();
+                        
+                        let randomTarget = {x: [-1, 0, 1][Math.floor(Math.random()*3)], y: [0, 1][Math.floor(Math.random()*2)]};
+                        
+                        if(isUserShooter) {
+                            submitOnlineMove({ type: 'shot', target: randomTarget, isGreen: false }); 
+                        } else {
+                            submitOnlineMove({ type: 'dive', target: randomTarget });
+                        }
+                    }
+                }
+            }, 1000);
+        });
+    }
+
+    // ---------------------------------------------------------
+    // ONLINE MULTIPLAYER SIMULATION / FIREBASE SYNC LOGIC
+    // ---------------------------------------------------------
+    async function submitOnlineMove(moveData) {
+        document.getElementById('turn-banner-sub').innerText = "WAITING FOR OPPONENT...";
+        
+        // ---------------------------------------------------------
+        // Yahan par window.dbSet() use karke moveData database mein bhejna hoga.
+        // Phir window.dbOnValue() se opponent ka data aane ka wait karna hoga.
+        // ---------------------------------------------------------
+        
+        await delay(1200); // Simulate network
+
+        let opponentChoices = {x: [-1, 0, 1][Math.floor(Math.random()*3)], y: [0, 1][Math.floor(Math.random()*2)]};
+        let opponentIsGreen = Math.random() < 0.8; 
+
+        document.getElementById('turn-banner').classList.remove('show');
+
+        let finalData;
+        if(moveData.type === 'shot') {
+            finalData = calculateResult(moveData.target, opponentChoices, moveData.isGreen);
+        } else {
+            finalData = calculateResult(opponentChoices, moveData.target, opponentIsGreen);
+        }
+
+        if(turnResolve) {
+            let res = turnResolve;
+            turnResolve = null;
+            res(finalData); 
+        }
+    }
+
+    function calculateResult(shotTarget, diveTarget, isAccurate) {
+        let isSave = (shotTarget.x === diveTarget.x && shotTarget.y === diveTarget.y);
+        let finalResult = 'goal';
+        
+        if (isAccurate) {
+            if (isSave) finalResult = 'save';
+        } else {
+            finalResult = (Math.random() > 0.5) ? 'post' : 'miss';
+        }
+
+        return {
+            shot: shotTarget,
+            gk: diveTarget,
+            result: finalResult,
+            foot: Math.random() > 0.5 ? 'l' : 'r',
+            style: 4
+        };
+    }
+
+    function checkWinCondition() {
+        if (!match.isSuddenDeath) { 
+            let remainA = 5 - match.kicksA; let remainB = 5 - match.kicksB; 
+            if (match.scoreA > match.scoreB + remainB) return match.teamA; 
+            if (match.scoreB > match.scoreA + remainA) return match.teamB; 
+            if (match.kicksA === 5 && match.kicksB === 5 && match.scoreA !== match.scoreB) return match.scoreA > match.scoreB ? match.teamA : match.teamB; 
+        } else { 
+            if (match.kicksA === match.kicksB && match.scoreA !== match.scoreB) return match.scoreA > match.scoreB ? match.teamA : match.teamB; 
+        } 
+        return null;
+    }
+
+
+    /*===================================================================
+      ANIMATIONS & VISUALS
+    ===================================================================*/
+    function getPlayerHTML(flagEmoji, isKeeper=false) {
+        let activeClass = isKeeper ? 'keeper-ready' : 'idle-breathe';
+        return `<div class="player-model ${activeClass}"><div class="marble-flag">${flagEmoji}<div class="face neutral"><div class="eyes"><div class="eye"></div><div class="eye"></div></div><div class="mouth"></div></div></div><div class="player-arms"><div class="player-arm left"></div><div class="player-arm right"></div></div><div class="player-body"></div><div class="player-legs"><div class="player-leg left"></div><div class="player-leg right"></div></div></div>`;
+    }
+
+    function resetPitch(startLeft, startTop, shooterFlag, keeperFlag) {
+        return new Promise(resolve => {
+            let b = document.getElementById('ball'); let bInner = document.getElementById('ball-inner'); let g = document.getElementById('goalkeeper'); let s = document.getElementById('shooter');
+            s.innerHTML = getPlayerHTML(shooterFlag, false); g.innerHTML = getPlayerHTML(keeperFlag, true);
+            b.style.transition = 'none'; g.style.transition = 'none'; s.style.transition = 'none'; s.style.opacity = '1'; g.style.opacity = '1'; b.style.opacity = '1';
+            b.style.top = '45%'; b.style.left = '50%'; b.style.transform = 'translate3d(-50%, -50%, 0) scale(1)'; bInner.classList.remove('spin'); 
+            g.style.top = '15%'; g.style.left = '50%'; g.style.transform = 'translate3d(-50%, -50%, 0)'; 
+            s.style.top = startTop; s.style.left = startLeft; s.style.transform = 'translate3d(-50%, -50%, 0) scale(1)'; setTimeout(resolve, 20); 
+        });
+    }
+
+    async function executeKickAnimation(data) {
+        let b = document.getElementById('ball'); let bInner = document.getElementById('ball-inner'); let g = document.getElementById('goalkeeper'); let s = document.getElementById('shooter');
+        let sModel = s.querySelector('.player-model'); let gModel = g.querySelector('.player-model');
+        
+        let kickClass = `kick-${data.foot}-4`;
+        sModel.classList.add(kickClass); sfx.kick(); 
+        
+        gModel.classList.remove('keeper-ready');
+        if(data.gk.y === 1) gModel.classList.add('diving-high'); else gModel.classList.add('diving'); 
+        
+        bInner.classList.add('spin');
+        b.style.transition = 'top 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), left 0.4s cubic-bezier(0.1, 0.8, 0.3, 1), transform 0.4s cubic-bezier(0.1, 0.8, 0.3, 1)';
+        g.style.transition = 'top 0.35s ease-out, left 0.35s ease-out, transform 0.35s ease-out';
+
+        let targetLeft, targetTop; let finalScale = 0.6;
+        
+        if (data.result === 'goal' || data.result === 'save') { 
+            targetLeft = 50 + (data.shot.x * 19.5); targetTop = data.shot.y === 1 ? 8 : 16; 
+        } 
+        else if (data.result === 'post') { 
+            targetLeft = data.shot.x === -1 ? 26 : (data.shot.x === 1 ? 74 : 50); 
+            targetTop = data.shot.y === 1 ? 2 : 15; 
+            if(data.shot.x === 0 && data.shot.y === 1) targetTop = 2; 
+        } 
+        else if (data.result === 'miss') { 
+            finalScale = 0.35; 
+            if (data.shot.y === 1) { targetTop = -2; targetLeft = 50 + (Math.random() * 30 - 15); } 
+            else if (data.shot.x === -1) { targetTop = 10; targetLeft = 10; } 
+            else { targetTop = 10; targetLeft = 90; } 
+        }
+
+        let gkLeft = 50 + (data.gk.x * 19); 
+        let gkTop = data.gk.y === 1 ? 8 : 14; 
+        let rot = data.gk.x * 75;
+        if(data.gk.y === 1 && data.gk.x === 0) rot = 0;
+
+        b.style.top = targetTop + '%'; b.style.left = targetLeft + '%'; b.style.transform = `translate3d(-50%, -50%, 0) scale(${finalScale})`;
+        g.style.top = gkTop + '%'; g.style.left = gkLeft + '%'; g.style.transform = `translate3d(-50%, -50%, 0) rotate(${rot}deg)`;
+        await delay(350); 
+    }
+
+    function handleResult(result, isTop) {
+        let dot = document.createElement('div'); dot.className = 'dot';
+        let sModel = document.getElementById('shooter').querySelector('.player-model'); let gModel = document.getElementById('goalkeeper').querySelector('.player-model');
+        let sFace = sModel.querySelector('.face'); let gFace = gModel.querySelector('.face');
+        sModel.className = 'player-model'; gModel.classList.remove('diving', 'diving-high');
+        let bInner = document.getElementById('ball-inner'); let b = document.getElementById('ball');
+
+        if (result === 'goal') {
+            let gPost = document.getElementById('goal'); gPost.classList.add('shake'); setTimeout(() => gPost.classList.remove('shake'), 500);
+            if (match.turn === 'A') match.scoreA++; else match.scoreB++;
+            sfx.net(); sfx.cheer(); showAlert("GOAL!", "#4ade80"); speak(isTop ? "Top Corner!" : "Goal!");
+            sFace.className = 'face happy'; sModel.classList.add('celebrating'); gFace.className = 'face sad'; gModel.classList.add('sad-anim'); dot.classList.add('goal'); dot.innerText = '✓';
+        } 
+        else if (result === 'save') {
+            bInner.classList.remove('spin'); sfx.save(); showAlert("SAVE!", "#ff3b30"); speak(isTop ? "Flying save!" : "Saved!");
+            b.style.transition = 'top 0.5s ease-out, left 0.5s ease-out, transform 0.5s ease-out'; 
+            let currentLeft = parseFloat(b.style.left);
+            if (isTop) { b.style.top = '-15%'; b.style.left = currentLeft > 50 ? '85%' : '15%'; b.style.transform = `translate3d(-50%, -50%, 0) scale(0.4)`; } 
+            else { b.style.top = '25%'; b.style.left = (currentLeft < 45) ? '35%' : (currentLeft > 55 ? '65%' : (50 + (Math.random()*10 - 5)) + '%'); b.style.transform = `translate3d(-50%, -50%, 0) scale(0.65)`; }
+            gFace.className = 'face happy'; gModel.classList.add('celebrating'); sFace.className = 'face sad'; sModel.classList.add('sad-anim'); dot.classList.add('miss'); dot.innerText = '✗';
+        } 
+        else if (result === 'post') {
+            let exp = document.getElementById('explosion'); exp.style.top = b.style.top; exp.style.left = b.style.left;
+            exp.classList.remove('explode-anim'); void exp.offsetWidth; exp.classList.add('explode-anim');
+            bInner.classList.remove('spin'); sfx.post(); sfx.aww(); showAlert("POST!", "#f8ca25"); speak("Off the post!");
+            b.style.transition = 'top 0.5s ease-out, left 0.5s ease-out'; let currentLeft = parseFloat(b.style.left);
+            b.style.top = '30%'; b.style.left = (currentLeft > 50 ? 80 : 20) + '%'; 
+            gFace.className = 'face happy'; gModel.classList.add('celebrating'); sFace.className = 'face sad'; sModel.classList.add('sad-anim'); dot.classList.add('miss'); dot.innerText = '✗';
+        } 
+        else {
+            sfx.aww(); showAlert("MISS!", "#aaaaaa"); speak("Missed!");
+            gFace.className = 'face happy'; gModel.classList.add('celebrating'); sFace.className = 'face sad'; sModel.classList.add('sad-anim'); dot.classList.add('miss'); dot.innerText = '✗';
+        }
+        
+        if (match.turn === 'A') { match.kicksA++; document.getElementById('dotsA').appendChild(dot); } else { match.kicksB++; document.getElementById('dotsB').appendChild(dot); }
+        updateScoreUI();
+    }
+
+    function updateScoreUI() { document.getElementById('scoreA').innerText = match.scoreA; document.getElementById('scoreB').innerText = match.scoreB; document.getElementById('kicksA-txt').innerText = match.kicksA; document.getElementById('kicksB-txt').innerText = match.kicksB; }
+    function showAlert(text, color) { let box = document.getElementById('alert-box'); let textEl = document.getElementById('alert-text'); textEl.innerText = text; textEl.style.color = color; box.classList.add('alert-show'); }
+    
+    async function showChampion(team) { 
+        let overlay = document.getElementById('champion-overlay'); let teamBox = document.getElementById('champ-team-box');
+        teamBox.innerHTML = `<div class="marble-flag">${team.flag}</div> ${team.name}`; overlay.classList.add('show');
+        sfx.champion(); sfx.cheer(); speak(`We have a champion! Congratulations to ${team.name}!`);
+        let emojis = ['🏆', '🥇', '✨', '🎉', team.flag];
+        for(let i=0; i<40; i++) {
+            let el = document.createElement('div'); el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+            el.className = 'falling-item'; el.style.left = Math.random() * 100 + 'vw';
+            el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = (Math.random() * 2) + 's'; overlay.appendChild(el);
+        }
+    }
+</script>
+</body>
+</html>
